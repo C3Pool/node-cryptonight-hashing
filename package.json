@@ -1,0 +1,26 @@
+{
+    "name": "cryptonight-hashing",
+    "version": "18.0.0",
+    "main": "cryptonight-hashing",
+    "author": {
+        "name": "Multiple",
+        "email": "Check The Git Repo"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/C3Pool/node-cryptonight-hashing.git"
+    },
+    "dependencies" : {
+        "bindings": "*",
+        "nan": "^2.8.0"
+    },
+    "keywords": [
+        "cryptonight",
+        "randomx",
+        "cuckaroo29",
+        "argon2",
+        "astrobwt",
+        "KangarooTwelve",
+        "monero"
+    ]
+}
