@@ -16,7 +16,6 @@
 #include "crypto/cn/CnHash.h"
 #include "crypto/randomx/configuration.h"
 #include "crypto/randomx/randomx.h"
-#include "crypto/defyx/defyx.h"
 #include "crypto/astrobwt/AstroBWT.h"
 
 extern "C" {
@@ -124,9 +123,9 @@ void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
         flags |= RANDOMX_FLAG_HARD_AES;
 #endif
 
-        rx_vm[algo] = randomx_create_vm(static_cast<randomx_flags>(flags), rx_cache[algo], nullptr, mem.scratchpad());
+        rx_vm[algo] = randomx_create_vm(static_cast<randomx_flags>(flags), rx_cache[algo], nullptr, mem.scratchpad(), 0);
         if (!rx_vm[algo]) {
-            rx_vm[algo] = randomx_create_vm(static_cast<randomx_flags>(flags - RANDOMX_FLAG_LARGE_PAGES), rx_cache[algo], nullptr, mem.scratchpad());
+            rx_vm[algo] = randomx_create_vm(static_cast<randomx_flags>(flags - RANDOMX_FLAG_LARGE_PAGES), rx_cache[algo], nullptr, mem.scratchpad(), 0);
         }
     }
 }
@@ -190,7 +189,8 @@ static xmrig::cn_hash_fun get_cn_fn(const int algo) {
     case 14: return FNA(CN_RWZ);
     case 15: return FNA(CN_ZLS);
     case 16: return FNA(CN_DOUBLE);
-    default: return FN(CN_1);
+    case 17: return FNA(CN_CCX);
+    default: return FN(CN_R);
   }
 }
 
@@ -514,4 +514,3 @@ NAN_MODULE_INIT(init) {
 }
 
 NODE_MODULE(cryptonight, init)
-
