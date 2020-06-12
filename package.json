@@ -1,6 +1,6 @@
 {
     "name": "cryptonight-hashing",
-    "version": "18.0.0",
+    "version": "19.0.0",
     "main": "cryptonight-hashing",
     "author": {
         "name": "Multiple",
@@ -8,7 +8,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/C3Pool/node-cryptonight-hashing.git"
+        "url": "https://github.com/MoneroOcean/node-cryptonight-hashing.git"
     },
     "dependencies" : {
         "bindings": "*",
@@ -21,6 +21,7 @@
         "argon2",
         "astrobwt",
         "KangarooTwelve",
-        "monero"
+        "monero",
+        "kawpow"
     ]
 }

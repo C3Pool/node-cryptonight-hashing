@@ -20,6 +20,7 @@ lr.on('line', function (line) {
 lr.on('close', function(){
     if (testsFailed > 0){
         console.log(testsFailed + '/' + (testsPassed + testsFailed) + ' tests failed on: cryptonight-1');
+        process.exit(1);
     } else {
         console.log(testsPassed + ' tests passed on: cryptonight-1');
     }

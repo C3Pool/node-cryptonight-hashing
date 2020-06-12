@@ -6,8 +6,8 @@
  * Copyright 2016      Jay D Dee   <jayddee246@gmail.com>
  * Copyright 2017-2019 XMR-Stak    <https://github.com/fireice-uk>, <https://github.com/psychocrypt>
  * Copyright 2018      Lee Clagett <https://github.com/vtnerd>
- * Copyright 2018-2019 SChernykh   <https://github.com/SChernykh>
- * Copyright 2016-2019 XMRig       <https://github.com/xmrig>, <support@xmrig.com>
+ * Copyright 2018-2020 SChernykh   <https://github.com/SChernykh>
+ * Copyright 2016-2020 XMRig       <https://github.com/xmrig>, <support@xmrig.com>
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@
 #include <cstdint>
 
 
-#include "crypto/common/Algorithm.h"
+#include "base/crypto/Algorithm.h"
 
 
 namespace xmrig
@@ -53,24 +53,9 @@ public:
 
     inline static size_t memory(Algorithm::Id algo)
     {
-        switch (Algorithm::family(algo)) {
-        case Algorithm::CN:
-            return CN_MEMORY;
+        Algorithm algorithm(algo);
 
-        case Algorithm::CN_LITE:
-            return CN_MEMORY / 2;
-
-        case Algorithm::CN_HEAVY:
-            return CN_MEMORY * 2;
-
-        case Algorithm::CN_PICO:
-            return CN_MEMORY / 8;
-
-        default:
-            break;
-        }
-
-        return 0;
+        return algorithm.isCN() ? algorithm.l3() : 0;
     }
 
     inline static uint32_t iterations(Algorithm::Id algo)
@@ -94,6 +79,7 @@ public:
         case Algorithm::CN_HEAVY_TUBE:
         case Algorithm::CN_HEAVY_XHV:
 #       endif
+        case Algorithm::CN_CCX:
             return CN_ITER / 2;
 
         case Algorithm::CN_RWZ:
@@ -151,6 +137,7 @@ public:
         case Algorithm::CN_HEAVY_0:
         case Algorithm::CN_HEAVY_XHV:
 #       endif
+        case Algorithm::CN_CCX:
             return Algorithm::CN_0;
 
         case Algorithm::CN_1:
@@ -199,6 +186,7 @@ template<> constexpr inline Algorithm::Id CnAlgo<Algorithm::CN_XAO>::base() cons
 template<> constexpr inline Algorithm::Id CnAlgo<Algorithm::CN_LITE_0>::base() const        { return Algorithm::CN_0; }
 template<> constexpr inline Algorithm::Id CnAlgo<Algorithm::CN_HEAVY_0>::base() const       { return Algorithm::CN_0; }
 template<> constexpr inline Algorithm::Id CnAlgo<Algorithm::CN_HEAVY_XHV>::base() const     { return Algorithm::CN_0; }
+template<> constexpr inline Algorithm::Id CnAlgo<Algorithm::CN_CCX>::base() const           { return Algorithm::CN_0; }
 template<> constexpr inline Algorithm::Id CnAlgo<Algorithm::CN_1>::base() const             { return Algorithm::CN_1; }
 template<> constexpr inline Algorithm::Id CnAlgo<Algorithm::CN_FAST>::base() const          { return Algorithm::CN_1; }
 template<> constexpr inline Algorithm::Id CnAlgo<Algorithm::CN_RTO>::base() const           { return Algorithm::CN_1; }
@@ -220,6 +208,7 @@ template<> constexpr inline uint32_t CnAlgo<Algorithm::CN_ZLS>::iterations() con
 template<> constexpr inline uint32_t CnAlgo<Algorithm::CN_GPU>::iterations() const          { return 0xC000; }
 template<> constexpr inline uint32_t CnAlgo<Algorithm::CN_PICO_0>::iterations() const       { return CN_ITER / 8; }
 template<> constexpr inline uint32_t CnAlgo<Algorithm::CN_PICO_TLO>::iterations() const     { return CN_ITER / 8; }
+template<> constexpr inline uint32_t CnAlgo<Algorithm::CN_CCX>::iterations() const          { return CN_ITER / 2; }
 
 
 template<> constexpr inline size_t CnAlgo<Algorithm::CN_LITE_0>::memory() const             { return CN_MEMORY / 2; }

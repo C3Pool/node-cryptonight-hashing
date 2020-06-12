@@ -6,8 +6,8 @@
  * Copyright 2016      Jay D Dee   <jayddee246@gmail.com>
  * Copyright 2017-2019 XMR-Stak    <https://github.com/fireice-uk>, <https://github.com/psychocrypt>
  * Copyright 2018      Lee Clagett <https://github.com/vtnerd>
- * Copyright 2018-2019 SChernykh   <https://github.com/SChernykh>
- * Copyright 2016-2019 XMRig       <https://github.com/xmrig>, <support@xmrig.com>
+ * Copyright 2018-2020 SChernykh   <https://github.com/SChernykh>
+ * Copyright 2016-2020 XMRig       <https://github.com/xmrig>, <support@xmrig.com>
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@
 
 
 #include "backend/cpu/Cpu.h"
+#include "base/crypto/keccak.h"
 #include "crypto/cn/CnAlgo.h"
 #include "crypto/cn/CryptoNight_monero.h"
 #include "crypto/cn/CryptoNight.h"
 #include "crypto/cn/soft_aes.h"
-#include "crypto/common/keccak.h"
 
 
 extern "C"
@@ -51,11 +51,13 @@ extern "C"
 #include "crypto/cn/c_skein.h"
 }
 
+
 #if defined(__AES__) && (__AES__ == 1)
 #else
 #define _mm_aeskeygenassist_si128(a, b) a
 #define _mm_aesenc_si128(a, b) a
 #endif
+
 
 static inline void do_blake_hash(const uint8_t *input, size_t len, uint8_t *output) {
     blake256_hash(output, input, len);
@@ -550,6 +552,23 @@ static inline void cryptonight_monero_tweak(uint64_t *mem_out, const uint8_t *l,
 }
 
 
+static inline void cryptonight_conceal_tweak(__m128i& cx, __m128& conc_var)
+{
+    __m128 r = _mm_add_ps(_mm_cvtepi32_ps(cx), conc_var);
+    r = _mm_mul_ps(r, _mm_mul_ps(r, r));
+    r = _mm_and_ps(_mm_castsi128_ps(_mm_set1_epi32(0x807FFFFF)), r);
+    r = _mm_or_ps(_mm_castsi128_ps(_mm_set1_epi32(0x40000000)), r);
+
+    __m128 c_old = conc_var;
+    conc_var = _mm_add_ps(conc_var, r);
+
+    c_old = _mm_and_ps(_mm_castsi128_ps(_mm_set1_epi32(0x807FFFFF)), c_old);
+    c_old = _mm_or_ps(_mm_castsi128_ps(_mm_set1_epi32(0x40000000)), c_old);
+
+    __m128 nc = _mm_mul_ps(c_old, _mm_set1_ps(536870880.0f));
+    cx = _mm_xor_si128(cx, _mm_cvttps_epi32(nc));
+}
+
 template<Algorithm::Id ALGO, bool SOFT_AES>
 inline void cryptonight_single_hash(const uint8_t *__restrict__ input, size_t size, uint8_t *__restrict__ output, cryptonight_ctx **__restrict__ ctx, uint64_t height)
 {
@@ -603,10 +622,19 @@ inline void cryptonight_single_hash(const uint8_t *__restrict__ input, size_t si
     __m128i bx0   = _mm_set_epi64x(static_cast<int64_t>(h0[3] ^ h0[7]), static_cast<int64_t>(h0[2] ^ h0[6]));
     __m128i bx1   = _mm_set_epi64x(static_cast<int64_t>(h0[9] ^ h0[11]), static_cast<int64_t>(h0[8] ^ h0[10]));
 
+    __m128 conc_var;
+    if (ALGO == Algorithm::CN_CCX) {
+        conc_var = _mm_setzero_ps();
+        RESTORE_ROUNDING_MODE();
+    }
+
     for (size_t i = 0; i < props.iterations(); i++) {
         __m128i cx;
         if (IS_CN_HEAVY_TUBE || !SOFT_AES) {
             cx = _mm_load_si128(reinterpret_cast<const __m128i *>(&l0[idx0 & MASK]));
+            if (ALGO == Algorithm::CN_CCX) {
+                cryptonight_conceal_tweak(cx, conc_var);
+            }
         }
 
         const __m128i ax0 = _mm_set_epi64x(static_cast<int64_t>(ah0), static_cast<int64_t>(al0));
@@ -614,7 +642,14 @@ inline void cryptonight_single_hash(const uint8_t *__restrict__ input, size_t si
             cx = aes_round_tweak_div(cx, ax0);
         }
         else if (SOFT_AES) {
-            cx = soft_aesenc(&l0[idx0 & MASK], ax0, reinterpret_cast<const uint32_t*>(saes_table));
+            if (ALGO == Algorithm::CN_CCX) {
+                cx = _mm_load_si128(reinterpret_cast<const __m128i*>(&l0[idx0 & MASK]));
+                cryptonight_conceal_tweak(cx, conc_var);
+                cx = soft_aesenc(&cx, ax0, reinterpret_cast<const uint32_t*>(saes_table));
+            }
+            else {
+                cx = soft_aesenc(&l0[idx0 & MASK], ax0, reinterpret_cast<const uint32_t*>(saes_table));
+            }
         }
         else {
             cx = _mm_aesenc_si128(cx, ax0);
@@ -1047,6 +1082,13 @@ inline void cryptonight_double_hash(const uint8_t *__restrict__ input, size_t si
     __m128i bx10 = _mm_set_epi64x(h1[3] ^ h1[7], h1[2] ^ h1[6]);
     __m128i bx11 = _mm_set_epi64x(h1[9] ^ h1[11], h1[8] ^ h1[10]);
 
+    __m128 conc_var0, conc_var1;
+    if (ALGO == Algorithm::CN_CCX) {
+        conc_var0 = _mm_setzero_ps();
+        conc_var1 = _mm_setzero_ps();
+        RESTORE_ROUNDING_MODE();
+    }
+
     uint64_t idx0 = al0;
     uint64_t idx1 = al1;
 
@@ -1055,6 +1097,10 @@ inline void cryptonight_double_hash(const uint8_t *__restrict__ input, size_t si
         if (IS_CN_HEAVY_TUBE || !SOFT_AES) {
             cx0 = _mm_load_si128(reinterpret_cast<const __m128i *>(&l0[idx0 & MASK]));
             cx1 = _mm_load_si128(reinterpret_cast<const __m128i *>(&l1[idx1 & MASK]));
+            if (ALGO == Algorithm::CN_CCX) {
+                cryptonight_conceal_tweak(cx0, conc_var0);
+                cryptonight_conceal_tweak(cx1, conc_var1);
+            }
         }
 
         const __m128i ax0 = _mm_set_epi64x(ah0, al0);
@@ -1064,8 +1110,18 @@ inline void cryptonight_double_hash(const uint8_t *__restrict__ input, size_t si
             cx1 = aes_round_tweak_div(cx1, ax1);
         }
         else if (SOFT_AES) {
-            cx0 = soft_aesenc(&l0[idx0 & MASK], ax0, reinterpret_cast<const uint32_t*>(saes_table));
-            cx1 = soft_aesenc(&l1[idx1 & MASK], ax1, reinterpret_cast<const uint32_t*>(saes_table));
+            if (ALGO == Algorithm::CN_CCX) {
+                cx0 = _mm_load_si128(reinterpret_cast<const __m128i*>(&l0[idx0 & MASK]));
+                cx1 = _mm_load_si128(reinterpret_cast<const __m128i*>(&l1[idx1 & MASK]));
+                cryptonight_conceal_tweak(cx0, conc_var0);
+                cryptonight_conceal_tweak(cx1, conc_var1);
+                cx0 = soft_aesenc(&cx0, ax0, reinterpret_cast<const uint32_t*>(saes_table));
+                cx1 = soft_aesenc(&cx1, ax1, reinterpret_cast<const uint32_t*>(saes_table));
+            }
+            else {
+                cx0 = soft_aesenc(&l0[idx0 & MASK], ax0, reinterpret_cast<const uint32_t*>(saes_table));
+                cx1 = soft_aesenc(&l1[idx1 & MASK], ax1, reinterpret_cast<const uint32_t*>(saes_table));
+            }
         }
         else {
             cx0 = _mm_aesenc_si128(cx0, ax0);
@@ -1220,9 +1276,13 @@ inline void cryptonight_double_hash(const uint8_t *__restrict__ input, size_t si
 }
 
 
-#define CN_STEP1(a, b0, b1, c, l, ptr, idx)           \
+#define CN_STEP1(a, b0, b1, c, l, ptr, idx, conc_var) \
     ptr = reinterpret_cast<__m128i*>(&l[idx & MASK]); \
-    c = _mm_load_si128(ptr);
+    c = _mm_load_si128(ptr);                          \
+    if (ALGO == Algorithm::CN_CCX) {                  \
+        cryptonight_conceal_tweak(c, conc_var);       \
+    }
+
 
 
 #define CN_STEP2(a, b0, b1, c, l, ptr, idx)                                             \
@@ -1322,6 +1382,10 @@ inline void cryptonight_double_hash(const uint8_t *__restrict__ input, size_t si
     __m128i bx##n##0 = _mm_set_epi64x(h##n[3] ^ h##n[7], h##n[2] ^ h##n[6]);                     \
     __m128i bx##n##1 = _mm_set_epi64x(h##n[9] ^ h##n[11], h##n[8] ^ h##n[10]);                   \
     __m128i cx##n = _mm_setzero_si128();                                                         \
+    __m128 conc_var##n;                                                                          \
+    if (ALGO == Algorithm::CN_CCX) {                                                             \
+        conc_var##n = _mm_setzero_ps();                                                          \
+    }                                                                                            \
     VARIANT4_RANDOM_MATH_INIT(n);
 
 
@@ -1361,6 +1425,9 @@ inline void cryptonight_triple_hash(const uint8_t *__restrict__ input, size_t si
     CONST_INIT(ctx[1], 1);
     CONST_INIT(ctx[2], 2);
     VARIANT2_SET_ROUNDING_MODE();
+    if (ALGO == Algorithm::CN_CCX) {
+        RESTORE_ROUNDING_MODE();
+    }
 
     uint64_t idx0, idx1, idx2;
     idx0 = _mm_cvtsi128_si64(ax0);
@@ -1371,9 +1438,9 @@ inline void cryptonight_triple_hash(const uint8_t *__restrict__ input, size_t si
         uint64_t hi, lo;
         __m128i *ptr0, *ptr1, *ptr2;
 
-        CN_STEP1(ax0, bx00, bx01, cx0, l0, ptr0, idx0);
-        CN_STEP1(ax1, bx10, bx11, cx1, l1, ptr1, idx1);
-        CN_STEP1(ax2, bx20, bx21, cx2, l2, ptr2, idx2);
+        CN_STEP1(ax0, bx00, bx01, cx0, l0, ptr0, idx0, conc_var0);
+        CN_STEP1(ax1, bx10, bx11, cx1, l1, ptr1, idx1, conc_var1);
+        CN_STEP1(ax2, bx20, bx21, cx2, l2, ptr2, idx2, conc_var2);
 
         CN_STEP2(ax0, bx00, bx01, cx0, l0, ptr0, idx0);
         CN_STEP2(ax1, bx10, bx11, cx1, l1, ptr1, idx1);
@@ -1435,6 +1502,9 @@ inline void cryptonight_quad_hash(const uint8_t *__restrict__ input, size_t size
     CONST_INIT(ctx[2], 2);
     CONST_INIT(ctx[3], 3);
     VARIANT2_SET_ROUNDING_MODE();
+    if (ALGO == Algorithm::CN_CCX) {
+        RESTORE_ROUNDING_MODE();
+    }
 
     uint64_t idx0, idx1, idx2, idx3;
     idx0 = _mm_cvtsi128_si64(ax0);
@@ -1446,10 +1516,10 @@ inline void cryptonight_quad_hash(const uint8_t *__restrict__ input, size_t size
         uint64_t hi, lo;
         __m128i *ptr0, *ptr1, *ptr2, *ptr3;
 
-        CN_STEP1(ax0, bx00, bx01, cx0, l0, ptr0, idx0);
-        CN_STEP1(ax1, bx10, bx11, cx1, l1, ptr1, idx1);
-        CN_STEP1(ax2, bx20, bx21, cx2, l2, ptr2, idx2);
-        CN_STEP1(ax3, bx30, bx31, cx3, l3, ptr3, idx3);
+        CN_STEP1(ax0, bx00, bx01, cx0, l0, ptr0, idx0, conc_var0);
+        CN_STEP1(ax1, bx10, bx11, cx1, l1, ptr1, idx1, conc_var1);
+        CN_STEP1(ax2, bx20, bx21, cx2, l2, ptr2, idx2, conc_var2);
+        CN_STEP1(ax3, bx30, bx31, cx3, l3, ptr3, idx3, conc_var3);
 
         CN_STEP2(ax0, bx00, bx01, cx0, l0, ptr0, idx0);
         CN_STEP2(ax1, bx10, bx11, cx1, l1, ptr1, idx1);
@@ -1517,6 +1587,9 @@ inline void cryptonight_penta_hash(const uint8_t *__restrict__ input, size_t siz
     CONST_INIT(ctx[3], 3);
     CONST_INIT(ctx[4], 4);
     VARIANT2_SET_ROUNDING_MODE();
+    if (ALGO == Algorithm::CN_CCX) {
+        RESTORE_ROUNDING_MODE();
+    }
 
     uint64_t idx0, idx1, idx2, idx3, idx4;
     idx0 = _mm_cvtsi128_si64(ax0);
@@ -1529,11 +1602,11 @@ inline void cryptonight_penta_hash(const uint8_t *__restrict__ input, size_t siz
         uint64_t hi, lo;
         __m128i *ptr0, *ptr1, *ptr2, *ptr3, *ptr4;
 
-        CN_STEP1(ax0, bx00, bx01, cx0, l0, ptr0, idx0);
-        CN_STEP1(ax1, bx10, bx11, cx1, l1, ptr1, idx1);
-        CN_STEP1(ax2, bx20, bx21, cx2, l2, ptr2, idx2);
-        CN_STEP1(ax3, bx30, bx31, cx3, l3, ptr3, idx3);
-        CN_STEP1(ax4, bx40, bx41, cx4, l4, ptr4, idx4);
+        CN_STEP1(ax0, bx00, bx01, cx0, l0, ptr0, idx0, conc_var0);
+        CN_STEP1(ax1, bx10, bx11, cx1, l1, ptr1, idx1, conc_var1);
+        CN_STEP1(ax2, bx20, bx21, cx2, l2, ptr2, idx2, conc_var2);
+        CN_STEP1(ax3, bx30, bx31, cx3, l3, ptr3, idx3, conc_var3);
+        CN_STEP1(ax4, bx40, bx41, cx4, l4, ptr4, idx4, conc_var4);
 
         CN_STEP2(ax0, bx00, bx01, cx0, l0, ptr0, idx0);
         CN_STEP2(ax1, bx10, bx11, cx1, l1, ptr1, idx1);

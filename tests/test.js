@@ -32,6 +32,7 @@ for (let hashType in hashes){
         lr.on('close', function(){
             if (testsFailed > 0){
                 console.log(testsFailed + '/' + (testsPassed + testsFailed) + ' tests failed on: ' + hashType);
+                process.exit(1);
             } else {
                 console.log(testsPassed + ' tests passed on: ' +hashType);
             }

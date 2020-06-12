@@ -21,6 +21,7 @@ lr.on('line', function (line) {
          if (line_count === (testsFailed + testsPassed)){
              if (testsFailed > 0){
                  console.log(testsFailed + '/' + (testsPassed + testsFailed) + ' tests failed on: cryptonight-wow_async');
+                 process.exit(1);
              } else {
                  console.log(testsPassed + ' tests passed on: cryptonight-wow_async');
              }

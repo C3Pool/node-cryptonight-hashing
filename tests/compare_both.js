@@ -24,6 +24,7 @@ lr.on('line', function (line) {
         if (line_count === (testsFailed + testsPassed)){
             if (testsFailed > 0){
                 console.log(testsFailed + '/' + (testsPassed + testsFailed) + ' comparision tests failed');
+                process.exit(1);
             } else {
                 console.log(testsPassed + ' comparision tests passed');
             }
