@@ -22,27 +22,43 @@
  *   along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef XMRIG_CPU_H
-#define XMRIG_CPU_H
+
+#include <cassert>
 
 
-#include "backend/cpu/interfaces/ICpuInfo.h"
+#include "backend/cpu/Cpu.h"
 
 
-namespace xmrig {
+#if defined(XMRIG_FEATURE_HWLOC)
+#   include "backend/cpu/platform/HwlocCpuInfo.h"
+#elif defined(XMRIG_FEATURE_LIBCPUID)
+#   include "backend/cpu/platform/AdvancedCpuInfo.h"
+#else
+#   include "backend/cpu/platform/BasicCpuInfo.h"
+#endif
 
 
-class Cpu
+static xmrig::ICpuInfo *cpuInfo = nullptr;
+
+
+xmrig::ICpuInfo *xmrig::Cpu::info()
 {
-public:
-    static ICpuInfo *info();
-    static void release();
+    if (cpuInfo == nullptr) {
+#       if defined(XMRIG_FEATURE_HWLOC)
+        cpuInfo = new HwlocCpuInfo();
+#       elif defined(XMRIG_FEATURE_LIBCPUID)
+        cpuInfo = new AdvancedCpuInfo();
+#       else
+        cpuInfo = new BasicCpuInfo();
+#       endif
+    }
 
-    inline static Assembly::Id assembly(Assembly::Id hint) { return hint == Assembly::AUTO ? Cpu::info()->assembly() : hint; }
-};
+    return cpuInfo;
+}
 
 
-} /* namespace xmrig */
-
-
-#endif /* XMRIG_CPU_H */
+void xmrig::Cpu::release()
+{
+    delete cpuInfo;
+    cpuInfo = nullptr;
+}

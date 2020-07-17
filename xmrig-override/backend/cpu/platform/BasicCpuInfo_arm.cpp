@@ -4,9 +4,9 @@
  * Copyright 2014      Lucas Jones <https://github.com/lucasjones>
  * Copyright 2014-2016 Wolf9466    <https://github.com/OhGodAPet>
  * Copyright 2016      Jay D Dee   <jayddee246@gmail.com>
- * Copyright 2017-2018 XMR-Stak    <https://github.com/fireice-uk>, <https://github.com/psychocrypt>
+ * Copyright 2017-2019 XMR-Stak    <https://github.com/fireice-uk>, <https://github.com/psychocrypt>
  * Copyright 2018-2020 SChernykh   <https://github.com/SChernykh>
- * Copyright 2016-2020 XMRig       <https://github.com/xmrig>, <support@xmrig.com>
+ * Copyright 2016-2020 XMRig       <support@xmrig.com>
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -22,27 +22,43 @@
  *   along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef XMRIG_CPU_H
-#define XMRIG_CPU_H
+#include <array>
+#include <cstring>
+#include <thread>
 
 
-#include "backend/cpu/interfaces/ICpuInfo.h"
+#if __ARM_FEATURE_CRYPTO && !defined(__APPLE__)
+#   include <sys/auxv.h>
+#   include <asm/hwcap.h>
+#endif
 
 
-namespace xmrig {
+#include "backend/cpu/platform/BasicCpuInfo.h"
+#include "3rdparty/rapidjson/document.h"
 
 
-class Cpu
+xmrig::BasicCpuInfo::BasicCpuInfo() :
+    m_threads(std::thread::hardware_concurrency())
 {
-public:
-    static ICpuInfo *info();
-    static void release();
+#   ifdef XMRIG_ARMv8
+    memcpy(m_brand, "ARMv8", 5);
+#   else
+    memcpy(m_brand, "ARMv7", 5);
+#   endif
 
-    inline static Assembly::Id assembly(Assembly::Id hint) { return hint == Assembly::AUTO ? Cpu::info()->assembly() : hint; }
-};
+#   if __ARM_FEATURE_CRYPTO
+#   if !defined(__APPLE__)
+    m_flags.set(FLAG_AES, getauxval(AT_HWCAP) & HWCAP_AES);
+#   else
+    m_flags.set(FLAG_AES, true);
+#   endif
+#   endif
+}
 
 
-} /* namespace xmrig */
+const char *xmrig::BasicCpuInfo::backend() const
+{
+    return "basic/1";
+}
 
 
-#endif /* XMRIG_CPU_H */

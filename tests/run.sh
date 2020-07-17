@@ -29,6 +29,7 @@ node test_sync_pico.js || exit 1
 node test_rx0.js || exit 1
 node test_rx_arq.js || exit 1
 node test_rx_defyx.js || exit 1
+node test_rx_xla.js || exit 1
 node test_rx_wow.js || exit 1
 node test_rx_loki.js || exit 1
 node test_rx_keva.js || exit 1
@@ -37,6 +38,7 @@ node test_ar2_chukwa.js || exit 1
 node test_ar2_wrkz.js || exit 1
 
 node test_perf.js
+node test_perf_xla.js
 node test_perf_kawpow.js
 node test_perf_astrobwt.js
 node test_perf_k12.js

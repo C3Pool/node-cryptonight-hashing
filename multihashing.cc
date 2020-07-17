@@ -21,7 +21,7 @@
 #include "crypto/kawpow/KPCache.h"
 
 extern "C" {
-#include "crypto/defyx/KangarooTwelve.h"
+#include "crypto/randomx/defyx/KangarooTwelve.h"
 #include "crypto/randomx/blake2/blake2.h"
 #include "c29/portable_endian.h" // for htole32/64
 #include "c29/int-util.h"
@@ -95,6 +95,9 @@ void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
             case 2:
                 randomx_apply_config(RandomX_ArqmaConfig);
                 break;
+            case 3:
+                randomx_apply_config(RandomX_Scala2Config);
+                break;
             case 17:
                 randomx_apply_config(RandomX_WowneroConfig);
                 break;
@@ -166,11 +169,18 @@ NAN_METHOD(randomx) {
     }
 
     char output[32];
+    xmrig::Algorithm xalgo;
     switch (algo) {
-      case 1:  defyx_calculate_hash  (rx_vm[algo], reinterpret_cast<const uint8_t*>(Buffer::Data(target)), Buffer::Length(target), reinterpret_cast<uint8_t*>(output));
-               break;
-      default: randomx_calculate_hash(rx_vm[algo], reinterpret_cast<const uint8_t*>(Buffer::Data(target)), Buffer::Length(target), reinterpret_cast<uint8_t*>(output));
+        case 0:  xalgo = xmrig::Algorithm::RX_0; break;
+        case 1:  xalgo = xmrig::Algorithm::RX_DEFYX; break;
+        case 2:  xalgo = xmrig::Algorithm::RX_ARQ; break;
+        case 3:  xalgo = xmrig::Algorithm::RX_XLA; break;
+        case 17: xalgo = xmrig::Algorithm::RX_WOW; break;
+        case 18: xalgo = xmrig::Algorithm::RX_LOKI; break;
+        case 19: xalgo = xmrig::Algorithm::RX_KEVA; break;
+        default: xalgo = xmrig::Algorithm::RX_0;
     }
+    randomx_calculate_hash(rx_vm[algo], reinterpret_cast<const uint8_t*>(Buffer::Data(target)), Buffer::Length(target), reinterpret_cast<uint8_t*>(output), xalgo);
 
     v8::Local<v8::Value> returnValue = Nan::CopyBuffer(output, 32).ToLocalChecked();
     info.GetReturnValue().Set(returnValue);
@@ -463,6 +473,27 @@ NAN_METHOD(c29v) {
 	info.GetReturnValue().Set(Nan::New<Number>(retval));
 }
 
+NAN_METHOD(c29b) {
+	if (info.Length() != 2) return THROW_ERROR_EXCEPTION("You must provide 2 arguments: header, ring");
+	
+	char * input = Buffer::Data(info[0]);
+	uint32_t input_len = Buffer::Length(info[0]);
+
+	siphash_keys keys;
+	c29_setheader(input,input_len,&keys);
+	
+	Local<Array> ring = Local<Array>::Cast(info[1]);
+
+	uint32_t edges[PROOFSIZEb];
+	for (uint32_t n = 0; n < PROOFSIZEb; n++)
+		edges[n]=ring->Get(Nan::GetCurrentContext(), n).ToLocalChecked()->Uint32Value(Nan::GetCurrentContext()).FromJust();
+	
+	int retval = c29b_verify(edges,&keys);
+
+	info.GetReturnValue().Set(Nan::New<Number>(retval));
+}
+
+
 NAN_METHOD(c29_cycle_hash) {
 	if (info.Length() != 1) return THROW_ERROR_EXCEPTION("You must provide 1 argument:ring");
 	
@@ -474,6 +505,43 @@ NAN_METHOD(c29_cycle_hash) {
 	int bytepos = 0;
 	int bitpos = 0;
 	for(int i = 0; i < PROOFSIZE; i++){
+
+		uint32_t node = ring->Get(Nan::GetCurrentContext(), i).ToLocalChecked()->Uint32Value(Nan::GetCurrentContext()).FromJust();
+
+		for(int j = 0; j < EDGEBITS; j++) {
+			
+			if((node >> j) & 1U)
+				hashdata[bytepos] |= 1UL << bitpos;
+
+			bitpos++;
+			if(bitpos==8) {
+				bitpos=0;bytepos++;
+			}
+		}
+	}
+
+	unsigned char cyclehash[32];
+	rx_blake2b((void *)cyclehash, sizeof(cyclehash), (uint8_t *)hashdata, sizeof(hashdata), 0, 0);
+	
+	unsigned char rev_cyclehash[32];
+	for(int i = 0; i < 32; i++)
+		rev_cyclehash[i] = cyclehash[31-i];
+	
+	v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)rev_cyclehash, 32).ToLocalChecked();
+	info.GetReturnValue().Set(returnValue);
+}
+
+NAN_METHOD(c29b_cycle_hash) {
+	if (info.Length() != 1) return THROW_ERROR_EXCEPTION("You must provide 1 argument:ring");
+	
+	Local<Array> ring = Local<Array>::Cast(info[0]);
+
+	uint8_t hashdata[145]; // PROOFSIZEb*EDGEBITS/8
+	memset(hashdata, 0, 145);
+
+	int bytepos = 0;
+	int bitpos = 0;
+	for(int i = 0; i < PROOFSIZEb; i++){
 
 		uint32_t node = ring->Get(Nan::GetCurrentContext(), i).ToLocalChecked()->Uint32Value(Nan::GetCurrentContext()).FromJust();
 
@@ -548,7 +616,9 @@ NAN_MODULE_INIT(init) {
     Nan::Set(target, Nan::New("k12").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(k12)).ToLocalChecked());
     Nan::Set(target, Nan::New("c29s").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29s)).ToLocalChecked());
     Nan::Set(target, Nan::New("c29v").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29v)).ToLocalChecked());
+    Nan::Set(target, Nan::New("c29b").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29b)).ToLocalChecked());
     Nan::Set(target, Nan::New("c29_cycle_hash").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29_cycle_hash)).ToLocalChecked());
+    Nan::Set(target, Nan::New("c29b_cycle_hash").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29b_cycle_hash)).ToLocalChecked());
     Nan::Set(target, Nan::New("kawpow").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(kawpow)).ToLocalChecked());
 }
 
