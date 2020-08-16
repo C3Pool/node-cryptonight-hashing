@@ -15,7 +15,7 @@ Algorithms
 * RandomX (Wownero, Loki, Arqma, Keva)
 * DefyX, Panther (Scala)
 * KangarooTwelve (AEON)
-* cuckaroo29s, cuckaroo29v, cuckaroo29b
+* cuckaroo29s, cuckaroo29v, cuckaroo29b, cuckaroo29i
 * KawPow (RVN)
 
 Installing locally and testing

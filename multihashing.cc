@@ -473,6 +473,26 @@ NAN_METHOD(c29v) {
 	info.GetReturnValue().Set(Nan::New<Number>(retval));
 }
 
+NAN_METHOD(c29i) {
+	if (info.Length() != 2) return THROW_ERROR_EXCEPTION("You must provide 2 arguments: header, ring");
+	
+	char * input = Buffer::Data(info[0]);
+	uint32_t input_len = Buffer::Length(info[0]);
+
+	siphash_keys keys;
+	c29_setheader(input,input_len,&keys);
+	
+	Local<Array> ring = Local<Array>::Cast(info[1]);
+
+	uint32_t edges[PROOFSIZEi];
+	for (uint32_t n = 0; n < PROOFSIZEi; n++)
+		edges[n]=ring->Get(Nan::GetCurrentContext(), n).ToLocalChecked()->Uint32Value(Nan::GetCurrentContext()).FromJust();
+	
+	int retval = c29i_verify(edges,&keys);
+
+	info.GetReturnValue().Set(Nan::New<Number>(retval));
+}
+
 NAN_METHOD(c29b) {
 	if (info.Length() != 2) return THROW_ERROR_EXCEPTION("You must provide 2 arguments: header, ring");
 	
@@ -568,6 +588,43 @@ NAN_METHOD(c29b_cycle_hash) {
 	info.GetReturnValue().Set(returnValue);
 }
 
+NAN_METHOD(c29i_cycle_hash) {
+	if (info.Length() != 1) return THROW_ERROR_EXCEPTION("You must provide 1 argument:ring");
+
+	Local<Array> ring = Local<Array>::Cast(info[0]);
+
+	uint8_t hashdata[174]; // PROOFSIZEi*EDGEBITS/8
+	memset(hashdata, 0, 174);
+
+	int bytepos = 0;
+	int bitpos = 0;
+	for(int i = 0; i < PROOFSIZEi; i++){
+
+		uint32_t node = ring->Get(Nan::GetCurrentContext(), i).ToLocalChecked()->Uint32Value(Nan::GetCurrentContext()).FromJust();
+
+		for(int j = 0; j < EDGEBITS; j++) {
+
+			if((node >> j) & 1U)
+				hashdata[bytepos] |= 1UL << bitpos;
+
+			bitpos++;
+			if(bitpos==8) {
+				bitpos=0;bytepos++;
+			}
+		}
+	}
+
+	unsigned char cyclehash[32];
+	rx_blake2b((void *)cyclehash, sizeof(cyclehash), (uint8_t *)hashdata, sizeof(hashdata), 0, 0);
+
+	unsigned char rev_cyclehash[32];
+	for(int i = 0; i < 32; i++)
+		rev_cyclehash[i] = cyclehash[31-i];
+
+	v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)rev_cyclehash, 32).ToLocalChecked();
+	info.GetReturnValue().Set(returnValue);
+}
+
 NAN_METHOD(kawpow) {
 	if (info.Length() != 3) return THROW_ERROR_EXCEPTION("You must provide 3 arguments: height, header hash + nonce (buff 40), target (buff 8)");
 
@@ -617,8 +674,10 @@ NAN_MODULE_INIT(init) {
     Nan::Set(target, Nan::New("c29s").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29s)).ToLocalChecked());
     Nan::Set(target, Nan::New("c29v").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29v)).ToLocalChecked());
     Nan::Set(target, Nan::New("c29b").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29b)).ToLocalChecked());
+    Nan::Set(target, Nan::New("c29i").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29i)).ToLocalChecked());
     Nan::Set(target, Nan::New("c29_cycle_hash").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29_cycle_hash)).ToLocalChecked());
     Nan::Set(target, Nan::New("c29b_cycle_hash").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29b_cycle_hash)).ToLocalChecked());
+    Nan::Set(target, Nan::New("c29i_cycle_hash").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29i_cycle_hash)).ToLocalChecked());
     Nan::Set(target, Nan::New("kawpow").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(kawpow)).ToLocalChecked());
 }
 

@@ -14,6 +14,7 @@
                 "multihashing.cc",
                 "xmrig-override/backend/cpu/Cpu.cpp",
                 "c29b.cc",
+                "c29i.cc",
                 "c29s.cc",
                 "c29v.cc",
                 "xmrig/crypto/cn/c_blake256.c",
