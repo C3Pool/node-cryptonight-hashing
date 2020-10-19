@@ -53,6 +53,8 @@ extern "C" {
 #include "crypto/randomx/defyx/KangarooTwelve.h"
 }
 
+#include "base/tools/Profiler.h"
+
 RandomX_ConfigurationWownero::RandomX_ConfigurationWownero()
 {
 	ArgonSalt = "RandomWOW\x01";
@@ -78,18 +80,6 @@ RandomX_ConfigurationWownero::RandomX_ConfigurationWownero()
 	fillAes4Rx4_Key[5] = fillAes4Rx4_Key[1];
 	fillAes4Rx4_Key[6] = fillAes4Rx4_Key[2];
 	fillAes4Rx4_Key[7] = fillAes4Rx4_Key[3];
-}
-
-RandomX_ConfigurationLoki::RandomX_ConfigurationLoki()
-{
-	ArgonIterations = 4;
-	ArgonLanes = 2;
-	ArgonSalt = "RandomXL\x12";
-	ProgramSize = 320;
-	ProgramCount = 7;
-
-	RANDOMX_FREQ_IADD_RS = 25;
-	RANDOMX_FREQ_CBRANCH = 16;
 }
 
 RandomX_ConfigurationArqma::RandomX_ConfigurationArqma()
@@ -138,21 +128,17 @@ RandomX_ConfigurationScala2::RandomX_ConfigurationScala2()
 
 RandomX_ConfigurationBase::RandomX_ConfigurationBase()
 	: ArgonMemory(262144)
-	, ArgonIterations(3)
+        , CacheAccesses(8)
+        , DatasetBaseSize(2147483648)
+        , ArgonIterations(3)
 	, ArgonLanes(1)
 	, ArgonSalt("RandomX\x03")
-	, CacheAccesses(8)
-	, SuperscalarLatency(170)
-	, DatasetBaseSize(2147483648)
-	, DatasetExtraSize(33554368)
 	, ScratchpadL1_Size(16384)
 	, ScratchpadL2_Size(262144)
 	, ScratchpadL3_Size(2097152)
 	, ProgramSize(256)
 	, ProgramIterations(2048)
 	, ProgramCount(8)
-	, JumpBits(8)
-	, JumpOffset(8)
 	, RANDOMX_FREQ_IADD_RS(16)
 	, RANDOMX_FREQ_IADD_M(7)
 	, RANDOMX_FREQ_ISUB_R(16)
@@ -193,52 +179,73 @@ RandomX_ConfigurationBase::RandomX_ConfigurationBase()
 	fillAes4Rx4_Key[6] = rx_set_int_vec_i128(0xf63befa7, 0x2ba9660a, 0xf765a38b, 0xf273c9e7);
 	fillAes4Rx4_Key[7] = rx_set_int_vec_i128(0xc0b0762d, 0x0c06d1fd, 0x915839de, 0x7a7cd609);
 
-#if defined(_M_X64) || defined(__x86_64__)
+#	if defined(_M_X64) || defined(__x86_64__)
+	// Workaround for Visual Studio placing trampoline in debug builds.
+	auto addr = [](void (*func)()) {
+		const uint8_t* p = reinterpret_cast<const uint8_t*>(func);
+#		if defined(_MSC_VER)
+		if (p[0] == 0xE9) {
+			p += *(const int32_t*)(p + 1) + 5;
+		}
+#		endif
+		return p;
+	};
+
 	{
-		const uint8_t* a = (const uint8_t*)&randomx_sshash_prefetch;
-		const uint8_t* b = (const uint8_t*)&randomx_sshash_end;
+		const uint8_t* a = addr(randomx_sshash_prefetch);
+		const uint8_t* b = addr(randomx_sshash_end);
 		memcpy(codeShhPrefetchTweaked, a, b - a);
 	}
 	{
-		const uint8_t* a = (const uint8_t*)&randomx_program_read_dataset;
-		const uint8_t* b = (const uint8_t*)&randomx_program_read_dataset_ryzen;
+		const uint8_t* a = addr(randomx_program_read_dataset);
+		const uint8_t* b = addr(randomx_program_read_dataset_ryzen);
 		memcpy(codeReadDatasetTweaked, a, b - a);
 		codeReadDatasetTweakedSize = b - a;
 	}
 	{
-		const uint8_t* a = (const uint8_t*)&randomx_program_read_dataset_ryzen;
-		const uint8_t* b = (const uint8_t*)&randomx_program_read_dataset_sshash_init;
+		const uint8_t* a = addr(randomx_program_read_dataset_ryzen);
+		const uint8_t* b = addr(randomx_program_read_dataset_sshash_init);
 		memcpy(codeReadDatasetRyzenTweaked, a, b - a);
 		codeReadDatasetRyzenTweakedSize = b - a;
 	}
 	{
-		const uint8_t* a = (const uint8_t*)&randomx_program_read_dataset_sshash_init;
-		const uint8_t* b = (const uint8_t*)&randomx_program_read_dataset_sshash_fin;
+		const uint8_t* a = addr(randomx_program_read_dataset_sshash_init);
+		const uint8_t* b = addr(randomx_program_read_dataset_sshash_fin);
 		memcpy(codeReadDatasetLightSshInitTweaked, a, b - a);
 	}
 	{
-		const uint8_t* a = (const uint8_t*)&randomx_prefetch_scratchpad;
-		const uint8_t* b = (const uint8_t*)&randomx_prefetch_scratchpad_end;
+		const uint8_t* a = addr(randomx_prefetch_scratchpad);
+		const uint8_t* b = addr(randomx_prefetch_scratchpad_end);
 		memcpy(codePrefetchScratchpadTweaked, a, b - a);
 	}
-#endif
+#	endif
 }
 
+#ifdef XMRIG_ARMv8
 static uint32_t Log2(size_t value) { return (value > 1) ? (Log2(value / 2) + 1) : 0; }
+#endif
+
+static int scratchpadPrefetchMode = 1;
+
+void randomx_set_scratchpad_prefetch_mode(int mode)
+{
+	scratchpadPrefetchMode = mode;
+}
 
 void RandomX_ConfigurationBase::Apply()
 {
-	ScratchpadL1Mask_Calculated = (ScratchpadL1_Size / sizeof(uint64_t) - 1) * 8;
-	ScratchpadL1Mask16_Calculated = (ScratchpadL1_Size / sizeof(uint64_t) / 2 - 1) * 16;
-	ScratchpadL2Mask_Calculated = (ScratchpadL2_Size / sizeof(uint64_t) - 1) * 8;
-	ScratchpadL2Mask16_Calculated = (ScratchpadL2_Size / sizeof(uint64_t) / 2 - 1) * 16;
+	const uint32_t ScratchpadL1Mask_Calculated = (ScratchpadL1_Size / sizeof(uint64_t) - 1) * 8;
+	const uint32_t ScratchpadL2Mask_Calculated = (ScratchpadL2_Size / sizeof(uint64_t) - 1) * 8;
+
+	AddressMask_Calculated[0] = ScratchpadL2Mask_Calculated;
+	AddressMask_Calculated[1] = ScratchpadL1Mask_Calculated;
+	AddressMask_Calculated[2] = ScratchpadL1Mask_Calculated;
+	AddressMask_Calculated[3] = ScratchpadL1Mask_Calculated;
+
 	ScratchpadL3Mask_Calculated = (((ScratchpadL3_Size / sizeof(uint64_t)) - 1) * 8);
 	ScratchpadL3Mask64_Calculated = ((ScratchpadL3_Size / sizeof(uint64_t)) / 8 - 1) * 64;
 
-	CacheLineAlignMask_Calculated = (DatasetBaseSize - 1) & ~(RANDOMX_DATASET_ITEM_SIZE - 1);
-	DatasetExtraItems_Calculated = DatasetExtraSize / RANDOMX_DATASET_ITEM_SIZE;
-
-	ConditionMask_Calculated = (1 << JumpBits) - 1;
+        CacheLineAlignMask_Calculated = (DatasetBaseSize - 1) & ~(RANDOMX_DATASET_ITEM_SIZE - 1);
 
 #if defined(_M_X64) || defined(__x86_64__)
 	*(uint32_t*)(codeShhPrefetchTweaked + 3) = ArgonMemory * 16 - 1;
@@ -252,7 +259,42 @@ void RandomX_ConfigurationBase::Apply()
 	*(uint32_t*)(codePrefetchScratchpadTweaked + 4) = ScratchpadL3Mask64_Calculated;
 	*(uint32_t*)(codePrefetchScratchpadTweaked + 18) = ScratchpadL3Mask64_Calculated;
 
-#define JIT_HANDLE(x, prev) randomx::JitCompilerX86::engine[k] = &randomx::JitCompilerX86::h_##x
+	// Apply scratchpad prefetch mode
+	{
+		uint32_t* a = (uint32_t*)(codePrefetchScratchpadTweaked + 8);
+		uint32_t* b = (uint32_t*)(codePrefetchScratchpadTweaked + 22);
+
+		switch (scratchpadPrefetchMode)
+		{
+		case 0:
+			*a = 0x00401F0FUL; // 4-byte nop
+			*b = 0x00401F0FUL; // 4-byte nop
+			break;
+
+		case 1:
+		default:
+			*a = 0x060C180FUL; // prefetcht0 [rsi+rax]
+			*b = 0x160C180FUL; // prefetcht0 [rsi+rdx]
+			break;
+
+		case 2:
+			*a = 0x0604180FUL; // prefetchnta [rsi+rax]
+			*b = 0x1604180FUL; // prefetchnta [rsi+rdx]
+			break;
+
+		case 3:
+			*a = 0x060C8B48UL; // mov rcx, [rsi+rax]
+			*b = 0x160C8B48UL; // mov rcx, [rsi+rdx]
+			break;
+		}
+	}
+
+typedef void(randomx::JitCompilerX86::* InstructionGeneratorX86_2)(const randomx::Instruction&);
+
+#define JIT_HANDLE(x, prev) do { \
+		const InstructionGeneratorX86_2 p = &randomx::JitCompilerX86::h_##x; \
+		memcpy(randomx::JitCompilerX86::engine + k, &p, sizeof(p)); \
+	} while (0)
 
 #elif defined(XMRIG_ARMv8)
 
@@ -268,16 +310,16 @@ void RandomX_ConfigurationBase::Apply()
 #define JIT_HANDLE(x, prev)
 #endif
 
-	constexpr int CEIL_NULL = 0;
-	int k = 0;
+	uint32_t k = 0;
+	uint32_t freq_sum = 0;
 
 #define INST_HANDLE(x, prev) \
-	CEIL_##x = CEIL_##prev + RANDOMX_FREQ_##x; \
-	for (; k < CEIL_##x; ++k) { JIT_HANDLE(x, prev); }
+	freq_sum += RANDOMX_FREQ_##x; \
+	for (; k < freq_sum; ++k) { JIT_HANDLE(x, prev); }
 
 #define INST_HANDLE2(x, func_name, prev) \
-	CEIL_##x = CEIL_##prev + RANDOMX_FREQ_##x; \
-	for (; k < CEIL_##x; ++k) { JIT_HANDLE(func_name, prev); }
+	freq_sum += RANDOMX_FREQ_##x; \
+	for (; k < freq_sum; ++k) { JIT_HANDLE(func_name, prev); }
 
 	INST_HANDLE(IADD_RS, NULL);
 	INST_HANDLE(IADD_M, IADD_RS);
@@ -316,7 +358,17 @@ void RandomX_ConfigurationBase::Apply()
 	INST_HANDLE(FMUL_R, FSCAL_R);
 	INST_HANDLE(FDIV_M, FMUL_R);
 	INST_HANDLE(FSQRT_R, FDIV_M);
+
+#if defined(_M_X64) || defined(__x86_64__)
+	if (xmrig::Cpu::info()->jccErratum()) {
+		INST_HANDLE2(CBRANCH, CBRANCH<true>, FSQRT_R);
+	}
+	else {
+		INST_HANDLE2(CBRANCH, CBRANCH<false>, FSQRT_R);
+	}
+#else
 	INST_HANDLE(CBRANCH, FSQRT_R);
+#endif
 
 #if defined(_M_X64) || defined(__x86_64__)
 	if (xmrig::Cpu::info()->hasBMI2()) {
@@ -335,7 +387,6 @@ void RandomX_ConfigurationBase::Apply()
 
 RandomX_ConfigurationMonero RandomX_MoneroConfig;
 RandomX_ConfigurationWownero RandomX_WowneroConfig;
-RandomX_ConfigurationLoki RandomX_LokiConfig;
 RandomX_ConfigurationArqma RandomX_ArqmaConfig;
 RandomX_ConfigurationSafex RandomX_SafexConfig;
 RandomX_ConfigurationKeva RandomX_KevaConfig;
@@ -367,7 +418,7 @@ int rx_sipesh_k12(void *out, size_t outlen, const void *in, size_t inlen)
 
 int rx_yespower_k12(void *out, size_t outlen, const void *in, size_t inlen)
 {
-	rx_blake2b(out, outlen, in, inlen, 0, 0);
+	rx_blake2b_wrapper::run(out, outlen, in, inlen);
 	yespower_params_t params = { YESPOWER_1_0, 2048, 8, NULL };
 	if (yespower_tls((const uint8_t *)out, outlen, &params, (yespower_binary_t *)out)) return -1;
 	return KangarooTwelve((const unsigned char *)out, outlen, (unsigned char *)out, 32, 0, 0);
@@ -393,7 +444,7 @@ extern "C" {
 					break;
 
 				case RANDOMX_FLAG_JIT:
-					cache->jit          = new randomx::JitCompiler();
+					cache->jit          = new randomx::JitCompiler(false);
 					cache->initialize   = &randomx::initCacheCompile;
 					cache->datasetInit  = cache->jit->getDatasetInitFunc();
 					cache->memory       = memory;
@@ -579,44 +630,43 @@ extern "C" {
 		assert(output != nullptr);
 		alignas(16) uint64_t tempHash[8];
                 switch (algo) {
-		    case xmrig::Algorithm::RX_DEFYX: rx_sipesh_k12(tempHash, sizeof(tempHash), input, inputSize); break;
                     case xmrig::Algorithm::RX_XLA:   rx_yespower_k12(tempHash, sizeof(tempHash), input, inputSize); break;
-		    default: rx_blake2b(tempHash, sizeof(tempHash), input, inputSize, nullptr, 0);
+		    default: rx_blake2b_wrapper::run(tempHash, sizeof(tempHash), input, inputSize);
 		}
 		machine->initScratchpad(&tempHash);
 		machine->resetRoundingMode();
 		for (uint32_t chain = 0; chain < RandomX_CurrentConfig.ProgramCount - 1; ++chain) {
 			machine->run(&tempHash);
-			rx_blake2b(tempHash, sizeof(tempHash), machine->getRegisterFile(), sizeof(randomx::RegisterFile), nullptr, 0);
+			rx_blake2b_wrapper::run(tempHash, sizeof(tempHash), machine->getRegisterFile(), sizeof(randomx::RegisterFile));
 		}
 		machine->run(&tempHash);
-		machine->getFinalResult(output, RANDOMX_HASH_SIZE);
+		machine->getFinalResult(output);
 	}
 
 	void randomx_calculate_hash_first(randomx_vm* machine, uint64_t (&tempHash)[8], const void* input, size_t inputSize, const xmrig::Algorithm algo) {
                 switch (algo) {
-		    case xmrig::Algorithm::RX_DEFYX: rx_sipesh_k12(tempHash, sizeof(tempHash), input, inputSize); break;
                     case xmrig::Algorithm::RX_XLA:   rx_yespower_k12(tempHash, sizeof(tempHash), input, inputSize); break;
-		    default: rx_blake2b(tempHash, sizeof(tempHash), input, inputSize, nullptr, 0);
+		    default: rx_blake2b_wrapper::run(tempHash, sizeof(tempHash), input, inputSize);
 		}
 		machine->initScratchpad(tempHash);
 	}
 
 	void randomx_calculate_hash_next(randomx_vm* machine, uint64_t (&tempHash)[8], const void* nextInput, size_t nextInputSize, void* output, const xmrig::Algorithm algo) {
+		PROFILE_SCOPE(RandomX_hash);
+
 		machine->resetRoundingMode();
 		for (uint32_t chain = 0; chain < RandomX_CurrentConfig.ProgramCount - 1; ++chain) {
 			machine->run(&tempHash);
-			rx_blake2b(tempHash, sizeof(tempHash), machine->getRegisterFile(), sizeof(randomx::RegisterFile), nullptr, 0);
+			rx_blake2b_wrapper::run(tempHash, sizeof(tempHash), machine->getRegisterFile(), sizeof(randomx::RegisterFile));
 		}
 		machine->run(&tempHash);
 
 		// Finish current hash and fill the scratchpad for the next hash at the same time
                 switch (algo) {
-		    case xmrig::Algorithm::RX_DEFYX: rx_sipesh_k12(tempHash, sizeof(tempHash), nextInput, nextInputSize); break;
                     case xmrig::Algorithm::RX_XLA:   rx_yespower_k12(tempHash, sizeof(tempHash), nextInput, nextInputSize); break;
-		    default: rx_blake2b(tempHash, sizeof(tempHash), nextInput, nextInputSize, nullptr, 0);
+		    default: rx_blake2b_wrapper::run(tempHash, sizeof(tempHash), nextInput, nextInputSize);
 		}
-		machine->hashAndFill(output, RANDOMX_HASH_SIZE, tempHash);
+		machine->hashAndFill(output, tempHash);
 	}
 
 }

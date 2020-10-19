@@ -101,9 +101,6 @@ void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
             case 17:
                 randomx_apply_config(RandomX_WowneroConfig);
                 break;
-            case 18:
-                randomx_apply_config(RandomX_LokiConfig);
-                break;
             case 19:
                 randomx_apply_config(RandomX_KevaConfig);
                 break;
@@ -172,11 +169,11 @@ NAN_METHOD(randomx) {
     xmrig::Algorithm xalgo;
     switch (algo) {
         case 0:  xalgo = xmrig::Algorithm::RX_0; break;
-        case 1:  xalgo = xmrig::Algorithm::RX_DEFYX; break;
+        //case 1:  xalgo = xmrig::Algorithm::RX_DEFYX; break;
         case 2:  xalgo = xmrig::Algorithm::RX_ARQ; break;
         case 3:  xalgo = xmrig::Algorithm::RX_XLA; break;
         case 17: xalgo = xmrig::Algorithm::RX_WOW; break;
-        case 18: xalgo = xmrig::Algorithm::RX_LOKI; break;
+        //case 18: xalgo = xmrig::Algorithm::RX_LOKI; break;
         case 19: xalgo = xmrig::Algorithm::RX_KEVA; break;
         default: xalgo = xmrig::Algorithm::RX_0;
     }
@@ -233,6 +230,7 @@ static xmrig::cn_hash_fun get_argon2_fn(const int algo) {
   switch (algo) {
     case 0:  return FN(AR2_CHUKWA);
     case 1:  return FN(AR2_WRKZ);
+    case 2:  return FN(AR2_CHUKWA_V2);
     default: return FN(AR2_CHUKWA);
   }
 }
@@ -429,7 +427,7 @@ static void setsipkeys(const char *keybuf,siphash_keys *keys) {
 
 static void c29_setheader(const char *header, const uint32_t headerlen, siphash_keys *keys) {
 	char hdrkey[32];
-	rx_blake2b((void *)hdrkey, sizeof(hdrkey), (const void *)header, headerlen, 0, 0);
+	rx_blake2b((void *)hdrkey, sizeof(hdrkey), (const void *)header, headerlen);
 	setsipkeys(hdrkey,keys);
 }
 
@@ -541,7 +539,7 @@ NAN_METHOD(c29_cycle_hash) {
 	}
 
 	unsigned char cyclehash[32];
-	rx_blake2b((void *)cyclehash, sizeof(cyclehash), (uint8_t *)hashdata, sizeof(hashdata), 0, 0);
+	rx_blake2b((void *)cyclehash, sizeof(cyclehash), (uint8_t *)hashdata, sizeof(hashdata));
 	
 	unsigned char rev_cyclehash[32];
 	for(int i = 0; i < 32; i++)
@@ -578,7 +576,7 @@ NAN_METHOD(c29b_cycle_hash) {
 	}
 
 	unsigned char cyclehash[32];
-	rx_blake2b((void *)cyclehash, sizeof(cyclehash), (uint8_t *)hashdata, sizeof(hashdata), 0, 0);
+	rx_blake2b((void *)cyclehash, sizeof(cyclehash), (uint8_t *)hashdata, sizeof(hashdata));
 	
 	unsigned char rev_cyclehash[32];
 	for(int i = 0; i < 32; i++)
@@ -615,7 +613,7 @@ NAN_METHOD(c29i_cycle_hash) {
 	}
 
 	unsigned char cyclehash[32];
-	rx_blake2b((void *)cyclehash, sizeof(cyclehash), (uint8_t *)hashdata, sizeof(hashdata), 0, 0);
+	rx_blake2b((void *)cyclehash, sizeof(cyclehash), (uint8_t *)hashdata, sizeof(hashdata));
 
 	unsigned char rev_cyclehash[32];
 	for(int i = 0; i < 32; i++)

@@ -32,13 +32,11 @@ size_t xmrig::Algorithm::l2() const
 #   ifdef XMRIG_ALGO_RANDOMX
     switch (m_id) {
     case RX_0:
-    case RX_LOKI:
     case RX_SFX:
         return 0x40000;
 
     case RX_WOW:
     case RX_KEVA:
-    case RX_DEFYX:
     case RX_XLA:
         return 0x20000;
 
@@ -82,7 +80,6 @@ size_t xmrig::Algorithm::l3() const
     if (f == RANDOM_X) {
         switch (m_id) {
         case RX_0:
-        case RX_LOKI:
         case RX_SFX:
             return oneMiB * 2;
 
@@ -91,7 +88,6 @@ size_t xmrig::Algorithm::l3() const
             return oneMiB;
 
         case RX_ARQ:
-        case RX_DEFYX:
         case RX_XLA:
             return oneMiB / 4;
 
