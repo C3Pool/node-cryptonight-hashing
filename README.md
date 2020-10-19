@@ -10,10 +10,10 @@ Algorithms
 * cryptonight-light (v0, v1)
 * cryptonight-heavy (v0, xhv, tube)
 * cryptonight-pico (IRD)
-* argon2 (chukwa, wrkz)
+* argon2 (chukwa, chukwa2, wrkz)
 * astrobwt (DERO)
-* RandomX (Wownero, Loki, Arqma, Keva)
-* DefyX, Panther (Scala)
+* RandomX (Wownero, Arqma, Keva)
+* Panther (Scala)
 * KangarooTwelve (AEON)
 * cuckaroo29s, cuckaroo29v, cuckaroo29b, cuckaroo29i
 * KawPow (RVN)

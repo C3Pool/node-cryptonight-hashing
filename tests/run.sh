@@ -53,5 +53,5 @@ node test_perf_rx_keva.js
 node test_perf_rx_switch.js
 node test_perf_pico.js
 node test_perf_double.js
-node test_perf_ar2_chukwa.js
+node test_perf_ar2_chukwa2.js
 node test_perf_ar2_wrkz.js
