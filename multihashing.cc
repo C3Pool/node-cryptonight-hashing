@@ -18,7 +18,6 @@
 #include "crypto/randomx/randomx.h"
 #include "crypto/astrobwt/AstroBWT.h"
 #include "crypto/kawpow/KPHash.h"
-#include "crypto/kawpow/KPCache.h"
 
 extern "C" {
 #include "crypto/randomx/defyx/KangarooTwelve.h"
@@ -624,39 +623,33 @@ NAN_METHOD(c29i_cycle_hash) {
 }
 
 NAN_METHOD(kawpow) {
-	if (info.Length() != 3) return THROW_ERROR_EXCEPTION("You must provide 3 arguments: height, header hash + nonce (buff 40), target (buff 8)");
+	if (info.Length() != 3) return THROW_ERROR_EXCEPTION("You must provide 3 argument buffers: header hash (32 bytes), nonce (8 bytes), mixhash (32 bytes)");
 
 	v8::Isolate *isolate = v8::Isolate::GetCurrent();
 
-        if (!info[0]->IsNumber()) return THROW_ERROR_EXCEPTION("Argument 1 should be a number");
-        const uint32_t height = Nan::To<uint32_t>(info[0]).FromMaybe(0);
+	Local<Object> header_hash_buff = info[0]->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
+	if (!Buffer::HasInstance(header_hash_buff)) return THROW_ERROR_EXCEPTION("Argument 1 should be a buffer object.");
+	if (Buffer::Length(header_hash_buff) != 32) return THROW_ERROR_EXCEPTION("Argument 1 should be a 32 bytes long buffer object.");
 
-	Local<Object> header_nonce = info[1]->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
-	if (!Buffer::HasInstance(header_nonce)) return THROW_ERROR_EXCEPTION("Argument 2 should be a buffer object.");
-	if (Buffer::Length(header_nonce) != 40) return THROW_ERROR_EXCEPTION("Argument 2 should be a 40 bytes long buffer object.");
+	Local<Object> nonce_buff = info[1]->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
+	if (!Buffer::HasInstance(nonce_buff)) return THROW_ERROR_EXCEPTION("Argument 2 should be a buffer object.");
+	if (Buffer::Length(nonce_buff) != 8) return THROW_ERROR_EXCEPTION("Argument 2 should be a 8 bytes long buffer object.");
 
-	Local<Object> target_buff = info[2]->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
-	if (!Buffer::HasInstance(target_buff)) return THROW_ERROR_EXCEPTION("Argument 3 should be a buffer object.");
-	if (Buffer::Length(target_buff) != 8) return THROW_ERROR_EXCEPTION("Argument 3 should be a 8 bytes long buffer object.");
-        const uint64_t target = *reinterpret_cast<const uint64_t*>(Buffer::Data(target_buff));
+	Local<Object> mix_hash_buff = info[2]->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
+	if (!Buffer::HasInstance(mix_hash_buff)) return THROW_ERROR_EXCEPTION("Argument 3 should be a buffer object.");
+	if (Buffer::Length(mix_hash_buff) != 32) return THROW_ERROR_EXCEPTION("Argument 3 should be a 8 bytes long buffer object.");
 
-	xmrig::KPCache::s_cache.init(height / xmrig::KPHash::EPOCH_LENGTH);
-        uint32_t output[8];
+	uint32_t header_hash[8];
+	memcpy(header_hash, reinterpret_cast<const uint8_t*>(Buffer::Data(header_hash_buff)), sizeof(header_hash));
+        const uint64_t nonce = *(reinterpret_cast<const uint64_t*>(Buffer::Data(nonce_buff)));
         uint32_t mix_hash[8];
-	uint8_t header_hash[32];
-	memcpy(header_hash, reinterpret_cast<const uint8_t*>(Buffer::Data(header_nonce)), sizeof(header_hash));
-        const uint64_t nonce = *(reinterpret_cast<const uint64_t*>(Buffer::Data(header_nonce))+4);
-	xmrig::KPHash::calculate(xmrig::KPCache::s_cache, height, header_hash, nonce, output, mix_hash);
+	memcpy(mix_hash, reinterpret_cast<const uint8_t*>(Buffer::Data(mix_hash_buff)), sizeof(mix_hash));
 
-	uint8_t hash[32]{ 0 };
-	for (size_t i = 0; i < sizeof(hash); ++i) hash[i] = ((uint8_t*)output)[sizeof(hash) - 1 - i];
+        uint32_t output[8];
+	xmrig::KPHash::verify(header_hash, nonce, mix_hash, output);
 
-	if (*reinterpret_cast<uint64_t*>(hash + 24) < target) {
-		v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)mix_hash, 32).ToLocalChecked();
-		info.GetReturnValue().Set(returnValue);
-        } else {
-		info.GetReturnValue().Set(Nan::Null());
-	}
+	v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)output, 32).ToLocalChecked();
+	info.GetReturnValue().Set(returnValue);
 }
 
 

@@ -2,11 +2,12 @@
 const multiHashing = require('../build/Release/cryptonight-hashing');
 
 const result = multiHashing.kawpow(
-	30000, Buffer.from('ffeeddccbbaa9988776655443322110000112233445566778899aabbccddeefff0debc9a78563412', 'hex'),
-	Buffer.from('fc3c8e41e0be24c8', 'hex')
+	Buffer.from('63543d3913fe56e6720c5e61e8d208d05582875822628f483279a3e8d9c9a8b3', 'hex'),
+	Buffer.from('9b95eb33003ba288', 'hex'),
+	Buffer.from('89732e5ff8711c32558a308fc4b8ee77416038a70995670e3eb84cbdead2e337', 'hex')
 );
 
-if (result !== null && result.toString('hex') === '177b565752a375501e11b6d9d3679c2df6197b2cab3a1ba2d6b10b8c71a3d459')
+if (result !== null && result.toString('hex') === '0000000718ba5143286c46f44eee668fdf59b8eba810df21e4e2f4ec9538fc20')
 	console.log('KawPow test passed');
 else {
 	console.log('KawPow test failed: ' + (result ? result.toString('hex') : result));
