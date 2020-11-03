@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <nan.h>
 #include <stdexcept>
+#include <algorithm>
 
 //#if (defined(__AES__) && (__AES__ == 1)) || defined(__APPLE__) || defined(__ARM_ARCH)
 //#else
@@ -641,12 +642,13 @@ NAN_METHOD(kawpow) {
 
 	uint32_t header_hash[8];
 	memcpy(header_hash, reinterpret_cast<const uint8_t*>(Buffer::Data(header_hash_buff)), sizeof(header_hash));
-        const uint64_t nonce = *(reinterpret_cast<const uint64_t*>(Buffer::Data(nonce_buff)));
+        const uint64_t nonce = __builtin_bswap64(*(reinterpret_cast<const uint64_t*>(Buffer::Data(nonce_buff))));
         uint32_t mix_hash[8];
 	memcpy(mix_hash, reinterpret_cast<const uint8_t*>(Buffer::Data(mix_hash_buff)), sizeof(mix_hash));
 
         uint32_t output[8];
 	xmrig::KPHash::verify(header_hash, nonce, mix_hash, output);
+        std::reverse((char*)(&output[0]), (char*)(&output[8]));
 
 	v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)output, 32).ToLocalChecked();
 	info.GetReturnValue().Set(returnValue);
