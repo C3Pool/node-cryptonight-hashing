@@ -4,6 +4,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 cd $DIR
 node test.js || exit 1
+node test_ethash.js || exit 1
 node test_kawpow.js || exit 1
 node test_astrobwt.js || exit 1
 node test_k12.js || exit 1

@@ -17,6 +17,7 @@ Algorithms
 * KangarooTwelve (AEON)
 * cuckaroo29s, cuckaroo29v, cuckaroo29b, cuckaroo29i
 * KawPow (RVN)
+* Ethash (ETH)
 
 Installing locally and testing
 -----
