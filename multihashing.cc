@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <nan.h>
 #include <stdexcept>
-#include <algorithm>
 
 //#if (defined(__AES__) && (__AES__ == 1)) || defined(__APPLE__) || defined(__ARM_ARCH)
 //#else
@@ -26,13 +25,6 @@ extern "C" {
 #include "crypto/randomx/blake2/blake2.h"
 #include "c29/portable_endian.h" // for htole32/64
 #include "c29/int-util.h"
-
-void ethash_quick_hash(
-	ethash_h256_t* return_hash,
-	ethash_h256_t const* header_hash,
-	const uint64_t nonce,
-	ethash_h256_t const* mix_hash
-);
 }
 
 #include "c29.h"
@@ -656,14 +648,13 @@ NAN_METHOD(kawpow) {
 
         uint32_t output[8];
 	xmrig::KPHash::verify(header_hash, nonce, mix_hash, output);
-        std::reverse((char*)(&output[0]), (char*)(&output[8]));
 
 	v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)output, 32).ToLocalChecked();
 	info.GetReturnValue().Set(returnValue);
 }
 
 NAN_METHOD(ethash) {
-	if (info.Length() != 3) return THROW_ERROR_EXCEPTION("You must provide 3 argument buffers: header hash (32 bytes), nonce (8 bytes), mixhash (32 bytes)");
+	if (info.Length() != 3) return THROW_ERROR_EXCEPTION("You must provide 3 arguments: header hash (32 bytes), nonce (8 bytes), height (integer)");
 
 	v8::Isolate *isolate = v8::Isolate::GetCurrent();
 
@@ -675,21 +666,26 @@ NAN_METHOD(ethash) {
 	if (!Buffer::HasInstance(nonce_buff)) return THROW_ERROR_EXCEPTION("Argument 2 should be a buffer object.");
 	if (Buffer::Length(nonce_buff) != 8) return THROW_ERROR_EXCEPTION("Argument 2 should be a 8 bytes long buffer object.");
 
-	Local<Object> mix_hash_buff = info[2]->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
-	if (!Buffer::HasInstance(mix_hash_buff)) return THROW_ERROR_EXCEPTION("Argument 3 should be a buffer object.");
-	if (Buffer::Length(mix_hash_buff) != 32) return THROW_ERROR_EXCEPTION("Argument 3 should be a 8 bytes long buffer object.");
+        if (!info[2]->IsNumber()) return THROW_ERROR_EXCEPTION("Argument 3 should be a number");
+        const int height = Nan::To<int>(info[2]).FromMaybe(0);
 
-	uint32_t header_hash[8];
-	memcpy(header_hash, reinterpret_cast<const uint8_t*>(Buffer::Data(header_hash_buff)), sizeof(header_hash));
+	ethash_h256_t header_hash;
+	memcpy(&header_hash, reinterpret_cast<const uint8_t*>(Buffer::Data(header_hash_buff)), sizeof(header_hash));
         const uint64_t nonce = __builtin_bswap64(*(reinterpret_cast<const uint64_t*>(Buffer::Data(nonce_buff))));
-        uint32_t mix_hash[8];
-	memcpy(mix_hash, reinterpret_cast<const uint8_t*>(Buffer::Data(mix_hash_buff)), sizeof(mix_hash));
 
-        uint32_t output[8];
-	ethash_quick_hash((ethash_h256_t*)output, (ethash_h256_t*)header_hash, nonce, (ethash_h256_t*)mix_hash);
-        std::reverse((char*)(&output[0]), (char*)(&output[8]));
+        static int prev_epoch = 0;
+        static ethash_light_t cache = nullptr;
+        const int epoch = height / ETHASH_EPOCH_LENGTH;
+        if (prev_epoch != epoch) {
+            if (cache) ethash_light_delete(cache);
+            cache = ethash_light_new(height);
+            prev_epoch = epoch;
+        }
+        ethash_return_value_t res = ethash_light_compute(cache, header_hash, nonce);
 
-	v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)output, 32).ToLocalChecked();
+        v8::Local<v8::Array> returnValue = New<v8::Array>(2);
+        Nan::Set(returnValue, 0, Nan::CopyBuffer((char*)&res.result.b[0], 32).ToLocalChecked());
+        Nan::Set(returnValue, 1, Nan::CopyBuffer((char*)&res.mix_hash.b[0], 32).ToLocalChecked());
 	info.GetReturnValue().Set(returnValue);
 }
 

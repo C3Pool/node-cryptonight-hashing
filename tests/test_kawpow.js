@@ -7,14 +7,7 @@ const result = multiHashing.kawpow(
 	Buffer.from('89732e5ff8711c32558a308fc4b8ee77416038a70995670e3eb84cbdead2e337', 'hex')
 );
 
-function reverseBuffer(buff) {
-  let reversed = new Buffer(buff.length);
-  for (var i = buff.length - 1; i >= 0; i--) reversed[buff.length - i - 1] = buff[i];
-  return reversed;
-}
-
-
-if (result !== null && reverseBuffer(result).toString('hex') === '0000000718ba5143286c46f44eee668fdf59b8eba810df21e4e2f4ec9538fc20')
+if (result !== null && result.toString('hex') === '0000000718ba5143286c46f44eee668fdf59b8eba810df21e4e2f4ec9538fc20')
 	console.log('KawPow test passed');
 else {
 	console.log('KawPow test failed: ' + (result ? result.toString('hex') : result));

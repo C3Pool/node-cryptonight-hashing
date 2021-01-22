@@ -42,6 +42,7 @@ node test_ar2_wrkz.js || exit 1
 node test_perf.js
 node test_perf_xla.js
 node test_perf_kawpow.js
+node test_perf_ethash.js
 node test_perf_astrobwt.js
 node test_perf_k12.js
 node test_perf_light.js
