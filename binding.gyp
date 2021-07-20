@@ -2,11 +2,18 @@
     "targets": [
         {
             "target_name": "cryptonight-hashing",
+             'conditions': [
+                ['OS=="mac"', {
+                  'xcode_settings': {
+                    'GCC_ENABLE_CPP_EXCEPTIONS': 'YES'
+                  }
+                }]
+              ],
             "sources": [
                 '<!@(uname -a | grep "x86_64" >/dev/null && echo "xmrig/crypto/cn/asm/cn_main_loop.S" || echo)',
                 '<!@(uname -a | grep "x86_64" >/dev/null && echo "xmrig/crypto/cn/asm/CryptonightR_template.S" || echo)',
                 '<!@(uname -a | grep "x86_64" >/dev/null && echo "xmrig/crypto/cn/r/CryptonightR_gen.cpp" || echo)',
-                '<!@(uname -a | grep "x86_64" >/dev/null && (grep avx2 /proc/cpuinfo >/dev/null && echo "xmrig/crypto/cn/gpu/cn_gpu_avx.cpp" || echo) || echo)',
+                '<!@(uname -a | grep "x86_64" >/dev/null && (./check_cpu.sh avx2 && echo "xmrig/crypto/cn/gpu/cn_gpu_avx.cpp" || echo) || echo)',
                 '<!@(uname -a | grep "x86_64" >/dev/null && echo "xmrig/crypto/cn/gpu/cn_gpu_ssse3.cpp" || echo)',
                 '<!@(uname -a | grep "x86_64" >/dev/null || echo "xmrig/crypto/cn/gpu/cn_gpu_arm.cpp" || echo)',
                 '<!@(uname -a | grep "x86_64" >/dev/null && echo "xmrig-override/backend/cpu/platform/BasicCpuInfo.cpp" || echo)',
@@ -76,9 +83,9 @@
                 "xmrig/crypto/randomx/panthera/sha256.c",
                 "xmrig/crypto/randomx/panthera/yespower-opt.c",
 
-		"xmrig-override/crypto/kawpow/KPHash.cpp",
-		"xmrig/3rdparty/libethash/keccakf800.c",
-		"xmrig/3rdparty/libethash/ethash_internal.c",
+                "xmrig-override/crypto/kawpow/KPHash.cpp",
+                "xmrig/3rdparty/libethash/keccakf800.c",
+                "xmrig/3rdparty/libethash/ethash_internal.c",
             ],
             "include_dirs": [
                 "xmrig-override",
@@ -89,19 +96,20 @@
             ],
             "cflags_c": [
                 '<!@(uname -a | grep "aarch64" >/dev/null && echo "-march=armv8-a+crypto -flax-vector-conversions -DXMRIG_ARM=1" || (uname -a | grep "armv7" >/dev/null && echo "-mfpu=neon -flax-vector-conversions -DXMRIG_ARM=1" || echo "-march=native"))',
-                '<!@(grep Intel /proc/cpuinfo >/dev/null && echo -DCPU_INTEL || (grep AMD /proc/cpuinfo >/dev/null && (test `awk \'/cpu family/ && $NF~/^[0-9]*$/ {print $NF}\' /proc/cpuinfo | head -n1` -ge 23 && echo -DCPU_AMD || echo -DCPU_AMD_OLD) || echo))',
-                '<!@(grep avx2 /proc/cpuinfo >/dev/null && echo -DHAVE_AVX2 || echo)',
-                '<!@(grep sse2 /proc/cpuinfo >/dev/null && echo -DHAVE_SSE2 || echo)',
-                '<!@(grep ssse3 /proc/cpuinfo >/dev/null && echo -DHAVE_SSSE3 || echo)',
-                '<!@(grep avx512f /proc/cpuinfo >/dev/null && echo -DHAVE_AVX512F || echo)',
-                '<!@(grep xop /proc/cpuinfo >/dev/null && echo -DHAVE_XOP || echo)',
+                '<!@(./check_cpu.sh intel && echo -DCPU_INTEL || (./check_cpu.sh amd && (./check_cpu.sh amdnew && echo -DCPU_AMD || echo -DCPU_AMD_OLD) || echo))',
+                '<!@(./check_cpu.sh avx2 && echo -DHAVE_AVX2 || echo)',
+                '<!@(./check_cpu.sh sse2 && echo -DHAVE_SSE2 || echo)',
+                '<!@(./check_cpu.sh ssse3 && echo -DHAVE_SSSE3 || echo)',
+                '<!@(./check_cpu.sh avx512f && echo -DHAVE_AVX512F || echo)',
+                '<!@(./check_cpu.sh xop && echo -DHAVE_XOP || echo)',
                 "-std=gnu11      -fPIC -DNDEBUG -Ofast -fno-fast-math -w"
             ],
             "cflags_cc": [
                 '<!@(uname -a | grep "aarch64" >/dev/null && echo "-march=armv8-a+crypto -flax-vector-conversions -DXMRIG_ARM=1" || (uname -a | grep "armv7" >/dev/null && echo "-mfpu=neon -flax-vector-conversions -DXMRIG_ARM=1" || echo "-march=native"))',
-                '<!@(grep Intel /proc/cpuinfo >/dev/null && echo -DCPU_INTEL || (grep AMD /proc/cpuinfo >/dev/null && (test `awk \'/cpu family/ && $NF~/^[0-9]*$/ {print $NF}\' /proc/cpuinfo | head -n1` -ge 23 && echo -DCPU_AMD || echo -DCPU_AMD_OLD) || echo))',
+                '<!@(./check_cpu.sh intel && echo -DCPU_INTEL || (./check_cpu.sh amd && (./check_cpu.sh amdnew && echo -DCPU_AMD || echo -DCPU_AMD_OLD) || echo))',
                 "-std=gnu++11 -s -fPIC -DNDEBUG -Ofast -fno-fast-math -fexceptions -fno-rtti -Wno-class-memaccess -w"
-            ]
+            ],
+            'cflags!': [ '-fexceptions' ]
         }
     ]
 }

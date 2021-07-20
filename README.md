@@ -18,6 +18,7 @@ Algorithms
 * cuckaroo29s, cuckaroo29v, cuckaroo29b, cuckaroo29i
 * KawPow (RVN)
 * Ethash (ETH)
+* Autolykos2 (ERG)
 
 Installing locally and testing
 -----
