@@ -126,6 +126,18 @@ RandomX_ConfigurationScala2::RandomX_ConfigurationScala2()
 {
 }
 
+
+RandomX_ConfigurationGraft::RandomX_ConfigurationGraft()
+{
+  ArgonIterations = 3;
+  ArgonLanes = 2;
+  ArgonSalt = "RandomX-Graft\x01";
+  ProgramIterations = 2048;
+  ProgramSize = 280;
+  RANDOMX_FREQ_IROR_R = 7;
+  RANDOMX_FREQ_IROL_R = 3;
+}
+
 RandomX_ConfigurationBase::RandomX_ConfigurationBase()
 	: ArgonMemory(262144)
         , CacheAccesses(8)
@@ -392,6 +404,7 @@ RandomX_ConfigurationSafex RandomX_SafexConfig;
 RandomX_ConfigurationKeva RandomX_KevaConfig;
 RandomX_ConfigurationScala RandomX_ScalaConfig;
 RandomX_ConfigurationScala2 RandomX_Scala2Config;
+RandomX_ConfigurationGraft RandomX_GraftConfig;
 
 alignas(64) RandomX_ConfigurationBase RandomX_CurrentConfig;
 

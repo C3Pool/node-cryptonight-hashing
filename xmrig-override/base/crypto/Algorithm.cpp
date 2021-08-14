@@ -33,6 +33,7 @@ size_t xmrig::Algorithm::l2() const
     switch (m_id) {
     case RX_0:
     case RX_SFX:
+    case RX_GRAFT:
         return 0x40000;
 
     case RX_WOW:
@@ -81,6 +82,7 @@ size_t xmrig::Algorithm::l3() const
         switch (m_id) {
         case RX_0:
         case RX_SFX:
+        case RX_GRAFT:
             return oneMiB * 2;
 
         case RX_WOW:

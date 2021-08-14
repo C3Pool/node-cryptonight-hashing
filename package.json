@@ -1,6 +1,6 @@
 {
     "name": "cryptonight-hashing",
-    "version": "24.0.0",
+    "version": "25.0.0",
     "main": "cryptonight-hashing",
     "author": {
         "name": "Multiple",
@@ -12,7 +12,7 @@
     },
     "dependencies": {
         "bindings": "*",
-        "nan": "^2.8.0",
+        "nan": "^2.14.2",
         "bigint-buffer": "^1.1.5",
         "blake2": "^4.0.2",
         "uint64be": "^3.0.0"

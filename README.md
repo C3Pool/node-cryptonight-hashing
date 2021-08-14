@@ -12,7 +12,7 @@ Algorithms
 * cryptonight-pico (IRD)
 * argon2 (chukwa, chukwa2, wrkz)
 * astrobwt (DERO)
-* RandomX (Wownero, Arqma, Keva)
+* RandomX (Wownero, Arqma, Keva, Graft)
 * Panther (Scala)
 * KangarooTwelve (AEON)
 * cuckaroo29s, cuckaroo29v, cuckaroo29b, cuckaroo29i
