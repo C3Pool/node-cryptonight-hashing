@@ -19,7 +19,7 @@ const N = height => {
     return 2147387550;
   } else {
     let res = NBase;
-    let iterationsNumber = parseInt((height - IncreaseStart) / IncreasePeriodForN) + 1;
+    let iterationsNumber = Math.floor((height - IncreaseStart) / IncreasePeriodForN) + 1;
     for (let i = 0; i < iterationsNumber; i++) {
       res = res / BigInt(100) * BigInt(105);
     }
@@ -55,9 +55,9 @@ function genIndexes(seed, height) {
 
 module.exports.autolykos2_hashes = function(coinbaseBuffer, height) {
   const h = BigIntBuffer.toBufferBE(BigInt(height), 4);
-  const i = BigIntBuffer.toBufferBE(BigIntBuffer.toBigIntBE(blake2b(coinbaseBuffer).slice(24, 32)) % N(h), 4);
+  const i = BigIntBuffer.toBufferBE(BigIntBuffer.toBigIntBE(blake2b(coinbaseBuffer).slice(24, 32)) % N(height), 4);
   const e = blake2b(Buffer.concat([i, h, M])).slice(1, 32);
-  const J = genIndexes(Buffer.concat([e, coinbaseBuffer]), h).map(item => BigIntBuffer.toBufferBE(BigInt(item), 4));
+  const J = genIndexes(Buffer.concat([e, coinbaseBuffer]), height).map(item => BigIntBuffer.toBufferBE(BigInt(item), 4));
   const f = J.map(item => BigIntBuffer.toBigIntBE(blake2b(Buffer.concat([item, h, M])).slice(1, 32))).reduce((a, b) => a + b);
   const hash = BigIntBuffer.toBufferBE(f, 32);
 
