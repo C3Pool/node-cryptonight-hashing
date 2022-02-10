@@ -30,7 +30,6 @@
                 "xmrig/crypto/cn/c_skein.c",
                 "xmrig/base/crypto/keccak.cpp",
                 "xmrig/base/crypto/sha3.cpp",
-                "xmrig-override/base/crypto/Algorithm.cpp",
                 "xmrig/crypto/cn/CnCtx.cpp",
                 "xmrig/crypto/cn/CnHash.cpp",
                 "xmrig/crypto/common/MemoryPool.cpp",
@@ -69,19 +68,36 @@
                 '<!@(uname -a | grep "x86_64" >/dev/null && echo "xmrig/3rdparty/argon2/arch/x86_64/lib/argon2-sse2.c" || echo)',
                 '<!@(uname -a | grep "x86_64" >/dev/null && echo "xmrig/3rdparty/argon2/arch/x86_64/lib/argon2-ssse3.c" || echo)',
                 '<!@(uname -a | grep "x86_64" >/dev/null && echo "xmrig/3rdparty/argon2/arch/x86_64/lib/argon2-xop.c" || echo)',
-                '<!@(uname -a | grep "x86_64" >/dev/null && echo "xmrig/3rdparty/argon2/arch/x86_64/lib/cpu-flags.c" || echo)',
                 '<!@(uname -a | grep "x86_64" >/dev/null || echo "xmrig/3rdparty/argon2/arch/generic/lib/argon2-arch.c" || echo)',
 
                 "xmrig/crypto/astrobwt/AstroBWT.cpp",
                 "xmrig/crypto/astrobwt/Salsa20.cpp",
                 "xmrig/crypto/astrobwt/salsa20_ref/salsa20.c",
 
-                "xmrig/crypto/randomx/defyx/KangarooTwelve.c",
-                "xmrig/crypto/randomx/defyx/KeccakP-1600-reference.c",
-                "xmrig/crypto/randomx/defyx/KeccakSpongeWidth1600.c",
-                "xmrig/crypto/randomx/defyx/yescrypt-best.c",
+                "xmrig/crypto/randomx/panthera/KangarooTwelve.c",
+                "xmrig/crypto/randomx/panthera/KeccakP-1600-reference.c",
+                "xmrig/crypto/randomx/panthera/KeccakSpongeWidth1600.c",
                 "xmrig/crypto/randomx/panthera/sha256.c",
                 "xmrig/crypto/randomx/panthera/yespower-opt.c",
+
+                "xmrig/crypto/ghostrider/sph_blake.c",
+                "xmrig/crypto/ghostrider/sph_bmw.c",
+                "xmrig/crypto/ghostrider/sph_cubehash.c",
+                "xmrig/crypto/ghostrider/sph_echo.c",
+                "xmrig/crypto/ghostrider/sph_fugue.c",
+                "xmrig/crypto/ghostrider/sph_groestl.c",
+                "xmrig/crypto/ghostrider/sph_hamsi.c",
+                "xmrig/crypto/ghostrider/sph_hamsi_helper.c",
+                "xmrig/crypto/ghostrider/sph_jh.c",
+                "xmrig/crypto/ghostrider/sph_keccak.c",
+                "xmrig/crypto/ghostrider/sph_luffa.c",
+                "xmrig/crypto/ghostrider/sph_sha2.c",
+                "xmrig/crypto/ghostrider/sph_shabal.c",
+                "xmrig/crypto/ghostrider/sph_shavite.c",
+                "xmrig/crypto/ghostrider/sph_simd.c",
+                "xmrig/crypto/ghostrider/sph_skein.c",
+                "xmrig/crypto/ghostrider/sph_whirlpool.c",
+                "xmrig-override/crypto/ghostrider/ghostrider.cpp",
 
                 "xmrig-override/crypto/kawpow/KPHash.cpp",
                 "xmrig/3rdparty/libethash/keccakf800.c",
@@ -95,7 +111,7 @@
                 "<!(node -e \"require('nan')\")"
             ],
             "cflags_c": [
-                '<!@(uname -a | grep "aarch64" >/dev/null && echo "-march=armv8-a+crypto -flax-vector-conversions -DXMRIG_ARM=1" || (uname -a | grep "armv7" >/dev/null && echo "-mfpu=neon -flax-vector-conversions -DXMRIG_ARM=1" || echo "-march=native"))',
+                '<!@(uname -a | grep "aarch64" >/dev/null && echo "-march=armv8-a+crypto -flax-vector-conversions -DXMRIG_ARM=1" || (uname -a | grep "armv7" >/dev/null && echo "-mfpu=neon -flax-vector-conversions -DXMRIG_ARM=1" || echo "-march=native -DXMRIG_FEATURE_ASM"))',
                 '<!@(./check_cpu.sh intel && echo -DCPU_INTEL || (./check_cpu.sh amd && (./check_cpu.sh amdnew && echo -DCPU_AMD || echo -DCPU_AMD_OLD) || echo))',
                 '<!@(./check_cpu.sh avx2 && echo -DHAVE_AVX2 || echo)',
                 '<!@(./check_cpu.sh sse2 && echo -DHAVE_SSE2 || echo)',
@@ -105,7 +121,7 @@
                 "-std=gnu11      -fPIC -DNDEBUG -Ofast -fno-fast-math -w"
             ],
             "cflags_cc": [
-                '<!@(uname -a | grep "aarch64" >/dev/null && echo "-march=armv8-a+crypto -flax-vector-conversions -DXMRIG_ARM=1" || (uname -a | grep "armv7" >/dev/null && echo "-mfpu=neon -flax-vector-conversions -DXMRIG_ARM=1" || echo "-march=native"))',
+                '<!@(uname -a | grep "aarch64" >/dev/null && echo "-march=armv8-a+crypto -flax-vector-conversions -DXMRIG_ARM=1" || (uname -a | grep "armv7" >/dev/null && echo "-mfpu=neon -flax-vector-conversions -DXMRIG_ARM=1" || echo "-march=native -DXMRIG_FEATURE_ASM"))',
                 '<!@(./check_cpu.sh intel && echo -DCPU_INTEL || (./check_cpu.sh amd && (./check_cpu.sh amdnew && echo -DCPU_AMD || echo -DCPU_AMD_OLD) || echo))',
                 "-std=gnu++11 -s -fPIC -DNDEBUG -Ofast -fno-fast-math -fexceptions -fno-rtti -Wno-class-memaccess -w"
             ],

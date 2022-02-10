@@ -19,6 +19,7 @@ Algorithms
 * KawPow (RVN)
 * Ethash (ETH)
 * Autolykos2 (ERG)
+* Ghostrider (TRM)
 
 Installing locally and testing
 -----

@@ -154,7 +154,6 @@ struct RandomX_ConfigurationArqma : public RandomX_ConfigurationBase { RandomX_C
 struct RandomX_ConfigurationSafex : public RandomX_ConfigurationBase { RandomX_ConfigurationSafex(); };
 struct RandomX_ConfigurationKeva : public RandomX_ConfigurationBase { RandomX_ConfigurationKeva(); };
 struct RandomX_ConfigurationScala : public RandomX_ConfigurationBase { RandomX_ConfigurationScala(); };
-struct RandomX_ConfigurationScala2 : public RandomX_ConfigurationScala { RandomX_ConfigurationScala2(); };
 struct RandomX_ConfigurationGraft : public RandomX_ConfigurationBase { RandomX_ConfigurationGraft(); };
 
 extern RandomX_ConfigurationMonero RandomX_MoneroConfig;
@@ -163,7 +162,6 @@ extern RandomX_ConfigurationArqma RandomX_ArqmaConfig;
 extern RandomX_ConfigurationSafex RandomX_SafexConfig;
 extern RandomX_ConfigurationKeva RandomX_KevaConfig;
 extern RandomX_ConfigurationScala RandomX_ScalaConfig;
-extern RandomX_ConfigurationScala2 RandomX_Scala2Config;
 extern RandomX_ConfigurationGraft RandomX_GraftConfig;
 
 extern RandomX_ConfigurationBase RandomX_CurrentConfig;

@@ -19,9 +19,10 @@
 #include "crypto/astrobwt/AstroBWT.h"
 #include "crypto/kawpow/KPHash.h"
 #include "3rdparty/libethash/ethash.h"
+#include "crypto/ghostrider/ghostrider.h"
 
 extern "C" {
-#include "crypto/randomx/defyx/KangarooTwelve.h"
+#include "crypto/randomx/panthera/KangarooTwelve.h"
 #include "crypto/randomx/blake2/blake2.h"
 #include "c29/portable_endian.h" // for htole32/64
 #include "c29/int-util.h"
@@ -59,10 +60,24 @@ extern "C" {
 const size_t max_mem_size = 20 * 1024 * 1024;
 xmrig::VirtualMemory mem(max_mem_size, true, false, 0, 4096);
 static struct cryptonight_ctx* ctx = nullptr;
-static randomx_cache* rx_cache[xmrig::Algorithm::Id::MAX] = {nullptr};
-static randomx_vm* rx_vm[xmrig::Algorithm::Id::MAX] = {nullptr};
-//static xmrig::Algorithm::Id rx_variant = xmrig::Algorithm::Id::MAX;
-static uint8_t rx_seed_hash[xmrig::Algorithm::Id::MAX][32] = {};
+
+const int MAXRX = 7;
+int rx2id(xmrig::Algorithm::Id algo) {
+  switch (algo) {
+      case xmrig::Algorithm::RX_0:     return 0;
+      case xmrig::Algorithm::RX_WOW:   return 1;
+      case xmrig::Algorithm::RX_ARQ:   return 2;
+      case xmrig::Algorithm::RX_GRAFT: return 3;
+      case xmrig::Algorithm::RX_SFX:   return 4;
+      case xmrig::Algorithm::RX_KEVA:  return 5;
+      case xmrig::Algorithm::RX_XLA:   return MAXRX-1;
+      default: return 0;
+  }
+}
+
+static randomx_cache* rx_cache[MAXRX]         = {nullptr};
+static randomx_vm*    rx_vm[MAXRX]            = {nullptr};
+static uint8_t        rx_seed_hash[MAXRX][32] = {};
 
 struct InitCtx {
     InitCtx() {
@@ -72,66 +87,60 @@ struct InitCtx {
 
 void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
     bool update_cache = false;
-    if (!rx_cache[algo]) {
+    const int rxid = rx2id(algo);
+    assert(rxid < MAXRX);
+
+    randomx_set_scratchpad_prefetch_mode(0);
+    randomx_set_huge_pages_jit(false);
+    //randomx_set_optimized_dataset_init(0);
+
+    if (!rx_cache[rxid]) {
         uint8_t* const pmem = static_cast<uint8_t*>(_mm_malloc(RANDOMX_CACHE_MAX_SIZE, 4096));
-        rx_cache[algo] = randomx_create_cache(static_cast<randomx_flags>(RANDOMX_FLAG_JIT | RANDOMX_FLAG_LARGE_PAGES), pmem);
-        if (!rx_cache[algo]) {
-            rx_cache[algo] = randomx_create_cache(RANDOMX_FLAG_JIT, pmem);
-        }
+        rx_cache[rxid] = randomx_create_cache(RANDOMX_FLAG_JIT, pmem);
         update_cache = true;
     }
-    else if (memcmp(rx_seed_hash[algo], seed_hash_data, sizeof(rx_seed_hash[0])) != 0) {
+    else if (memcmp(rx_seed_hash[rxid], seed_hash_data, sizeof(rx_seed_hash[0])) != 0) {
         update_cache = true;
     }
 
-    //if (algo != rx_variant) {
-        switch (algo) {
-            case 0:
-                randomx_apply_config(RandomX_MoneroConfig);
-                break;
-            case 1:
-                randomx_apply_config(RandomX_ScalaConfig);
-                break;
-            case 2:
-                randomx_apply_config(RandomX_ArqmaConfig);
-                break;
-            case 3:
-                randomx_apply_config(RandomX_Scala2Config);
-                break;
-            case 17:
-                randomx_apply_config(RandomX_WowneroConfig);
-                break;
-            case 19:
-                randomx_apply_config(RandomX_KevaConfig);
-                break;
-            case 20:
-                randomx_apply_config(RandomX_GraftConfig);
-                break;
-            default:
-                throw std::domain_error("Unknown RandomX algo");
-        }
-        //rx_variant = algo;
-        //update_cache = true;
-    //}
+    switch (algo) {
+        case xmrig::Algorithm::RX_0:
+            randomx_apply_config(RandomX_MoneroConfig);
+            break;
+        case xmrig::Algorithm::RX_WOW:
+            randomx_apply_config(RandomX_WowneroConfig);
+            break;
+        case xmrig::Algorithm::RX_ARQ:
+            randomx_apply_config(RandomX_ArqmaConfig);
+            break;
+        case xmrig::Algorithm::RX_GRAFT:
+            randomx_apply_config(RandomX_GraftConfig);
+            break;
+        case xmrig::Algorithm::RX_KEVA:
+            randomx_apply_config(RandomX_KevaConfig);
+            break;
+        case xmrig::Algorithm::RX_XLA:
+            randomx_apply_config(RandomX_ScalaConfig);
+            break;
+        default:
+            throw std::domain_error("Unknown RandomX algo");
+    }
 
     if (update_cache) {
-        memcpy(rx_seed_hash[algo], seed_hash_data, sizeof(rx_seed_hash[0]));
-        randomx_init_cache(rx_cache[algo], rx_seed_hash[algo], sizeof(rx_seed_hash[0]));
-        if (rx_vm[algo]) {
-            randomx_vm_set_cache(rx_vm[algo], rx_cache[algo]);
+        memcpy(rx_seed_hash[rxid], seed_hash_data, sizeof(rx_seed_hash[0]));
+        randomx_init_cache(rx_cache[rxid], rx_seed_hash[rxid], sizeof(rx_seed_hash[0]));
+        if (rx_vm[rxid]) {
+            randomx_vm_set_cache(rx_vm[rxid], rx_cache[rxid]);
         }
     }
 
-    if (!rx_vm[algo]) {
-        int flags = RANDOMX_FLAG_LARGE_PAGES | RANDOMX_FLAG_JIT;
+    if (!rx_vm[rxid]) {
+        int flags = RANDOMX_FLAG_JIT;
 #if !SOFT_AES
         flags |= RANDOMX_FLAG_HARD_AES;
 #endif
 
-        rx_vm[algo] = randomx_create_vm(static_cast<randomx_flags>(flags), rx_cache[algo], nullptr, mem.scratchpad(), 0);
-        if (!rx_vm[algo]) {
-            rx_vm[algo] = randomx_create_vm(static_cast<randomx_flags>(flags - RANDOMX_FLAG_LARGE_PAGES), rx_cache[algo], nullptr, mem.scratchpad(), 0);
-        }
+        rx_vm[rxid] = randomx_create_vm(static_cast<randomx_flags>(flags), rx_cache[rxid], nullptr, mem.scratchpad(), 0);
     }
 }
 
@@ -162,13 +171,6 @@ NAN_METHOD(randomx) {
         algo = Nan::To<int>(info[2]).FromMaybe(0);
     }
 
-    try {
-        init_rx(reinterpret_cast<const uint8_t*>(Buffer::Data(seed_hash)), static_cast<xmrig::Algorithm::Id>(algo));
-    } catch (const std::domain_error &e) {
-        return THROW_ERROR_EXCEPTION(e.what());
-    }
-
-    char output[32];
     xmrig::Algorithm xalgo;
     switch (algo) {
         case 0:  xalgo = xmrig::Algorithm::RX_0; break;
@@ -181,12 +183,23 @@ NAN_METHOD(randomx) {
         case 20: xalgo = xmrig::Algorithm::RX_GRAFT; break;
         default: xalgo = xmrig::Algorithm::RX_0;
     }
-    randomx_calculate_hash(rx_vm[algo], reinterpret_cast<const uint8_t*>(Buffer::Data(target)), Buffer::Length(target), reinterpret_cast<uint8_t*>(output), xalgo);
+
+    try {
+        init_rx(reinterpret_cast<const uint8_t*>(Buffer::Data(seed_hash)), xalgo);
+    } catch (const std::domain_error &e) {
+        return THROW_ERROR_EXCEPTION(e.what());
+    }
+
+    char output[32];
+    randomx_calculate_hash(rx_vm[rx2id(xalgo)], reinterpret_cast<const uint8_t*>(Buffer::Data(target)), Buffer::Length(target), reinterpret_cast<uint8_t*>(output), xalgo);
 
     v8::Local<v8::Value> returnValue = Nan::CopyBuffer(output, 32).ToLocalChecked();
     info.GetReturnValue().Set(returnValue);
 }
 
+void ghostrider(const unsigned char* data, long unsigned int size, unsigned char* output, cryptonight_ctx** ctx, long unsigned int) {
+    xmrig::ghostrider::hash(data, size, output, ctx, nullptr);
+}
 
 static xmrig::cn_hash_fun get_cn_fn(const int algo) {
   switch (algo) {
@@ -203,6 +216,7 @@ static xmrig::cn_hash_fun get_cn_fn(const int algo) {
     case 15: return FNA(CN_ZLS);
     case 16: return FNA(CN_DOUBLE);
     case 17: return FNA(CN_CCX);
+    case 18: return ghostrider;
     default: return FN(CN_R);
   }
 }
