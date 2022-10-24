@@ -16,8 +16,6 @@
  *   along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "base/tools/String.h"
-
 
 #include <array>
 #include <cstring>
@@ -44,8 +42,6 @@
 
 #if defined(XMRIG_OS_UNIX)
 namespace xmrig {
-
-extern String cpu_name_arm();
 
 } // namespace xmrig
 #elif defined(XMRIG_OS_MACOS)
@@ -79,11 +75,6 @@ xmrig::BasicCpuInfo::BasicCpuInfo() :
 #   endif
 
 #   if defined(XMRIG_OS_UNIX)
-    auto name = cpu_name_arm();
-    if (!name.isNull()) {
-        strncpy(m_brand, name, sizeof(m_brand) - 1);
-    }
-
     m_flags.set(FLAG_PDPE1GB, std::ifstream("/sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages").good());
 #   elif defined(XMRIG_OS_MACOS)
     size_t buflen = sizeof(m_brand);

@@ -5,6 +5,12 @@
 #include <nan.h>
 #include <stdexcept>
 
+#if defined(__ARM_ARCH)
+  #define my_malloc(a, b) malloc(a)
+#else 
+  #define my_malloc(a, b) _mm_malloc(a, b)
+#endif
+
 //#if (defined(__AES__) && (__AES__ == 1)) || defined(__APPLE__) || defined(__ARM_ARCH)
 //#else
 //#define _mm_aeskeygenassist_si128(a, b) a
@@ -81,7 +87,7 @@ static uint8_t        rx_seed_hash[MAXRX][32] = {};
 
 struct InitCtx {
     InitCtx() {
-        xmrig::CnCtx::create(&ctx, static_cast<uint8_t*>(_mm_malloc(max_mem_size, 4096)), max_mem_size, 1);
+        xmrig::CnCtx::create(&ctx, static_cast<uint8_t*>(my_malloc(max_mem_size, 4096)), max_mem_size, 1);
     }
 } s;
 
@@ -95,7 +101,7 @@ void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
     //randomx_set_optimized_dataset_init(0);
 
     if (!rx_cache[rxid]) {
-        uint8_t* const pmem = static_cast<uint8_t*>(_mm_malloc(RANDOMX_CACHE_MAX_SIZE, 4096));
+        uint8_t* const pmem = static_cast<uint8_t*>(my_malloc(RANDOMX_CACHE_MAX_SIZE, 4096));
         rx_cache[rxid] = randomx_create_cache(RANDOMX_FLAG_JIT, pmem);
         update_cache = true;
     }
@@ -256,6 +262,7 @@ static xmrig::cn_hash_fun get_argon2_fn(const int algo) {
 static xmrig::cn_hash_fun get_astrobwt_fn(const int algo) {
   switch (algo) {
     case 0:  return FN(ASTROBWT_DERO);
+    case 1:  return FN(ASTROBWT_DERO_2);
     default: return FN(ASTROBWT_DERO);
   }
 }
@@ -696,8 +703,46 @@ NAN_METHOD(ethash) {
         const int epoch = height / ETHASH_EPOCH_LENGTH;
         if (prev_epoch != epoch) {
             if (cache) ethash_light_delete(cache);
-            cache = ethash_light_new(height);
+            cache = ethash_light_new(height, epoch, epoch);
             prev_epoch = epoch;
+        }
+        ethash_return_value_t res = ethash_light_compute(cache, header_hash, nonce);
+
+        v8::Local<v8::Array> returnValue = New<v8::Array>(2);
+        Nan::Set(returnValue, 0, Nan::CopyBuffer((char*)&res.result.b[0], 32).ToLocalChecked());
+        Nan::Set(returnValue, 1, Nan::CopyBuffer((char*)&res.mix_hash.b[0], 32).ToLocalChecked());
+	info.GetReturnValue().Set(returnValue);
+}
+
+NAN_METHOD(etchash) {
+	if (info.Length() != 3) return THROW_ERROR_EXCEPTION("You must provide 3 arguments: header hash (32 bytes), nonce (8 bytes), height (integer)");
+
+	v8::Isolate *isolate = v8::Isolate::GetCurrent();
+
+	Local<Object> header_hash_buff = info[0]->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
+	if (!Buffer::HasInstance(header_hash_buff)) return THROW_ERROR_EXCEPTION("Argument 1 should be a buffer object.");
+	if (Buffer::Length(header_hash_buff) != 32) return THROW_ERROR_EXCEPTION("Argument 1 should be a 32 bytes long buffer object.");
+
+	Local<Object> nonce_buff = info[1]->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
+	if (!Buffer::HasInstance(nonce_buff)) return THROW_ERROR_EXCEPTION("Argument 2 should be a buffer object.");
+	if (Buffer::Length(nonce_buff) != 8) return THROW_ERROR_EXCEPTION("Argument 2 should be a 8 bytes long buffer object.");
+
+        if (!info[2]->IsNumber()) return THROW_ERROR_EXCEPTION("Argument 3 should be a number");
+        const int height = Nan::To<int>(info[2]).FromMaybe(0);
+
+	ethash_h256_t header_hash;
+	memcpy(&header_hash, reinterpret_cast<const uint8_t*>(Buffer::Data(header_hash_buff)), sizeof(header_hash));
+        const uint64_t nonce = __builtin_bswap64(*(reinterpret_cast<const uint64_t*>(Buffer::Data(nonce_buff))));
+
+        static int prev_epoch_seed = 0;
+        static ethash_light_t cache = nullptr;
+        const int epoch_length = height >= ETCHASH_EPOCH_HEIGHT ? ETCHASH_EPOCH_LENGTH : ETHASH_EPOCH_LENGTH;
+        const int epoch       = height / epoch_length;
+        const int epoch_seed  = (epoch * epoch_length + 1) / ETHASH_EPOCH_LENGTH;
+        if (prev_epoch_seed != epoch_seed) {
+            if (cache) ethash_light_delete(cache);
+            cache = ethash_light_new(height, epoch_seed, epoch);
+            prev_epoch_seed = epoch_seed;
         }
         ethash_return_value_t res = ethash_light_compute(cache, header_hash, nonce);
 
@@ -726,6 +771,7 @@ NAN_MODULE_INIT(init) {
     Nan::Set(target, Nan::New("c29i_cycle_hash").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(c29i_cycle_hash)).ToLocalChecked());
     Nan::Set(target, Nan::New("kawpow").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(kawpow)).ToLocalChecked());
     Nan::Set(target, Nan::New("ethash").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(ethash)).ToLocalChecked());
+    Nan::Set(target, Nan::New("etchash").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(etchash)).ToLocalChecked());
 }
 
 NODE_MODULE(cryptonight, init)

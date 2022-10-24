@@ -81,6 +81,7 @@ struct ethash_light {
 	void* cache;
 	uint64_t cache_size;
 	uint64_t block_number;
+        uint64_t epoch;
 
 	// Used for fast division
 	uint32_t num_parent_nodes;

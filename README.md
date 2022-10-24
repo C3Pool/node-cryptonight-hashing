@@ -11,7 +11,7 @@ Algorithms
 * cryptonight-heavy (v0, xhv, tube)
 * cryptonight-pico (IRD)
 * argon2 (chukwa, chukwa2, wrkz)
-* astrobwt (DERO)
+* astrobwt (DERO, DERO-HE)
 * RandomX (Wownero, Arqma, Keva, Graft)
 * Panther (Scala)
 * KangarooTwelve (AEON)

@@ -7,8 +7,10 @@ node test_rtm.js || exit 1
 node test.js || exit 1
 node test_autolykos2.js || exit 1
 node test_ethash.js || exit 1
+node test_etchash.js || exit 1
 node test_kawpow.js || exit 1
 node test_astrobwt.js || exit 1
+node test_astrobwt2.js || exit 1
 node test_k12.js || exit 1
 node test_sync-1.js || exit 1
 node test_sync-2.js || exit 1
@@ -48,6 +50,7 @@ node test_perf_xla.js
 node test_perf_kawpow.js
 node test_perf_ethash.js
 node test_perf_astrobwt.js
+node test_perf_astrobwt2.js
 node test_perf_k12.js
 node test_perf_light.js
 node test_perf_heavy.js

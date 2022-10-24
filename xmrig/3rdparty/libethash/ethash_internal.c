@@ -48,16 +48,16 @@
 #define SHA3_256(a, b, c) sha3_HashBuffer(256, SHA3_FLAGS_KECCAK, b, c, a, 32)
 #define SHA3_512(a, b, c) sha3_HashBuffer(512, SHA3_FLAGS_KECCAK, b, c, a, 64)
 
-uint64_t ethash_get_datasize(uint64_t const block_number)
+uint64_t ethash_get_datasize(uint64_t const epoch)
 {
-	assert(block_number / ETHASH_EPOCH_LENGTH < 2048);
-	return dag_sizes[block_number / ETHASH_EPOCH_LENGTH];
+        assert(epoch < 2048);
+        return dag_sizes[epoch];
 }
 
-uint64_t ethash_get_cachesize(uint64_t const block_number)
+uint64_t ethash_get_cachesize(uint64_t const epoch)
 {
-	assert(block_number / ETHASH_EPOCH_LENGTH < 2048);
-	return cache_sizes[block_number / ETHASH_EPOCH_LENGTH];
+        assert(epoch < 2048);
+        return cache_sizes[epoch];
 }
 
 // Follows Sergio's "STRICT MEMORY HARD HASHING FUNCTIONS" (2014)
@@ -390,13 +390,14 @@ fail_free_light:
 	return NULL;
 }
 
-ethash_light_t ethash_light_new(uint64_t block_number)
+ethash_light_t ethash_light_new(uint64_t block_number, uint64_t epoch_seed, uint64_t epoch)
 {
-	ethash_h256_t seedhash = ethash_get_seedhash(block_number / ETHASH_EPOCH_LENGTH);
-	ethash_light_t ret;
-	ret = ethash_light_new_internal(ethash_get_cachesize(block_number), &seedhash);
-	ret->block_number = block_number;
-	return ret;
+        ethash_h256_t seedhash = ethash_get_seedhash(epoch_seed);
+        ethash_light_t ret;
+        ret = ethash_light_new_internal(ethash_get_cachesize(epoch), &seedhash);
+        ret->block_number = block_number;
+        ret->epoch = epoch;
+        return ret;
 }
 
 void ethash_light_delete(ethash_light_t light)
@@ -428,7 +429,7 @@ ethash_return_value_t ethash_light_compute(
 	uint64_t nonce
 )
 {
-	uint64_t full_size = ethash_get_datasize(light->block_number);
+	uint64_t full_size = ethash_get_datasize(light->epoch);
 	return ethash_light_compute_internal(light, full_size, header_hash, nonce);
 }
 

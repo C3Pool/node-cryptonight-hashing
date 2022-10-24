@@ -31,6 +31,8 @@
 #define ETHASH_CACHE_BYTES_INIT 1073741824U // 2**24
 #define ETHASH_CACHE_BYTES_GROWTH 131072U  // 2**17
 #define ETHASH_EPOCH_LENGTH 30000U
+#define ETCHASH_EPOCH_LENGTH 60000U
+#define ETCHASH_EPOCH_HEIGHT 11700000U
 #define ETHASH_MIX_BYTES 128
 #define ETHASH_HASH_BYTES 64
 #define ETHASH_DATASET_PARENTS 256
@@ -73,7 +75,7 @@ typedef struct ethash_return_value {
  * @return               Newly allocated ethash_light handler or NULL in case of
  *                       ERRNOMEM or invalid parameters used for @ref ethash_compute_cache_nodes()
  */
-ethash_light_t ethash_light_new(uint64_t block_number);
+ethash_light_t ethash_light_new(uint64_t block_number, uint64_t epoch_seed, uint64_t epoch);
 /**
  */
 bool ethash_compute_cache_nodes(

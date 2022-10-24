@@ -72,6 +72,7 @@
 
                 "xmrig/crypto/astrobwt/AstroBWT.cpp",
                 "xmrig/crypto/astrobwt/Salsa20.cpp",
+                "xmrig/crypto/astrobwt/sort_indices2.cpp",
                 "xmrig/crypto/astrobwt/salsa20_ref/salsa20.c",
 
                 "xmrig/crypto/randomx/panthera/KangarooTwelve.c",
