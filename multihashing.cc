@@ -141,7 +141,10 @@ void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
     }
 
     if (!rx_vm[rxid]) {
-        int flags = RANDOMX_FLAG_JIT;
+        int flags = 0;
+#if !defined(__ARM_ARCH)
+        flags |= RANDOMX_FLAG_JIT;
+#endif
 #if !SOFT_AES
         flags |= RANDOMX_FLAG_HARD_AES;
 #endif

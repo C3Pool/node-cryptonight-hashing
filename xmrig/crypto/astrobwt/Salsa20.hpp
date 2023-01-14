@@ -11,7 +11,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <emmintrin.h>
+#if defined(XMRIG_ARM)
+#   include "crypto/cn/sse2neon.h"
+#else
+#   include <emmintrin.h>
+#endif
 
 namespace ZeroTier {
 

@@ -53,6 +53,7 @@ void SHA3_256_AVX2_ASM(const void* in, size_t inBytes, void* out);
 extern "C" {
 #include "salsa20_ref/ecrypt-sync.h"
 }
+#include <string.h>
 
 static void Salsa20_XORKeyStream(const void* key, void* output, size_t size)
 {
