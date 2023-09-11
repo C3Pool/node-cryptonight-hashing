@@ -81,13 +81,16 @@ int rx2id(xmrig::Algorithm::Id algo) {
   }
 }
 
-static randomx_cache* rx_cache[MAXRX]         = {nullptr};
 static randomx_vm*    rx_vm[MAXRX]            = {nullptr};
-static uint8_t        rx_seed_hash[MAXRX][32] = {};
+
+const int rx_seed_cache_size = MAXRX+2;
+static randomx_cache* rx_cache[rx_seed_cache_size]         = {nullptr};
+static uint8_t        rx_seed_hash[rx_seed_cache_size][32] = {0};
 
 struct InitCtx {
     InitCtx() {
         xmrig::CnCtx::create(&ctx, static_cast<uint8_t*>(my_malloc(max_mem_size, 4096)), max_mem_size, 1);
+        for (int i = 0; i != rx_seed_cache_size; ++ i) memset(rx_seed_hash[i], 0xCC, sizeof(rx_seed_hash[0]));
     }
 } s;
 
@@ -99,15 +102,6 @@ void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
     randomx_set_scratchpad_prefetch_mode(0);
     randomx_set_huge_pages_jit(false);
     //randomx_set_optimized_dataset_init(0);
-
-    if (!rx_cache[rxid]) {
-        uint8_t* const pmem = static_cast<uint8_t*>(my_malloc(RANDOMX_CACHE_MAX_SIZE, 4096));
-        rx_cache[rxid] = randomx_create_cache(RANDOMX_FLAG_JIT, pmem);
-        update_cache = true;
-    }
-    else if (memcmp(rx_seed_hash[rxid], seed_hash_data, sizeof(rx_seed_hash[0])) != 0) {
-        update_cache = true;
-    }
 
     switch (algo) {
         case xmrig::Algorithm::RX_0:
@@ -132,12 +126,24 @@ void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
             throw std::domain_error("Unknown RandomX algo");
     }
 
-    if (update_cache) {
-        memcpy(rx_seed_hash[rxid], seed_hash_data, sizeof(rx_seed_hash[0]));
-        randomx_init_cache(rx_cache[rxid], rx_seed_hash[rxid], sizeof(rx_seed_hash[0]));
-        if (rx_vm[rxid]) {
-            randomx_vm_set_cache(rx_vm[rxid], rx_cache[rxid]);
+    static int new_rxid = 0;
+    int found_rxid = -1;
+    for (int i = 0; i != rx_seed_cache_size; ++ i)
+      if (memcmp(rx_seed_hash[i], seed_hash_data, sizeof(rx_seed_hash[0])) == 0) {
+        found_rxid = i;
+        break;
+      }
+
+    if (found_rxid == -1) {
+        if (!rx_cache[new_rxid]) {
+          uint8_t* const pmem = static_cast<uint8_t*>(my_malloc(RANDOMX_CACHE_MAX_SIZE, 4096));
+          rx_cache[new_rxid] = randomx_create_cache(RANDOMX_FLAG_JIT, pmem);
         }
+        memcpy(rx_seed_hash[new_rxid], seed_hash_data, sizeof(rx_seed_hash[0]));
+        randomx_init_cache(rx_cache[new_rxid], rx_seed_hash[new_rxid], sizeof(rx_seed_hash[0]));
+        found_rxid = new_rxid;
+        ++ new_rxid;
+        if (new_rxid >= rx_seed_cache_size) new_rxid = 0;
     }
 
     if (!rx_vm[rxid]) {
@@ -148,8 +154,9 @@ void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
 #if !SOFT_AES
         flags |= RANDOMX_FLAG_HARD_AES;
 #endif
-
-        rx_vm[rxid] = randomx_create_vm(static_cast<randomx_flags>(flags), rx_cache[rxid], nullptr, mem.scratchpad(), 0);
+        rx_vm[rxid] = randomx_create_vm(static_cast<randomx_flags>(flags), rx_cache[found_rxid], nullptr, mem.scratchpad(), 0);
+    } else {
+        randomx_vm_set_cache(rx_vm[rxid], rx_cache[found_rxid]);
     }
 }
 
