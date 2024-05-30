@@ -3,6 +3,7 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 cd $DIR
+node test_kcn.js || exit 1
 node test_rtm.js || exit 1
 node test.js || exit 1
 node test_autolykos2.js || exit 1
@@ -32,6 +33,7 @@ node test_sync_heavy-xhv.js || exit 1
 node test_sync_heavy-tube.js || exit 1
 node test_sync_pico.js || exit 1
 node test_rx0.js || exit 1
+node test_rx_xeq.js || exit 1
 node test_rx_arq.js || exit 1
 #node test_rx_defyx.js || exit 1
 node test_rx_xla.js || exit 1
@@ -44,6 +46,7 @@ node test_ar2_chukwa.js || exit 1
 node test_ar2_chukwa2.js || exit 1
 node test_ar2_wrkz.js || exit 1
 
+node test_perf_kcn.js
 node test_perf_rtm.js
 node test_perf.js
 node test_perf_xla.js

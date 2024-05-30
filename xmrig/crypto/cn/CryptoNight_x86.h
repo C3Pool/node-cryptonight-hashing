@@ -81,11 +81,17 @@ static inline void do_skein_hash(const uint8_t *input, size_t len, uint8_t *outp
     xmr_skein(input, output);
 }
 
+static inline void do_flex_skein_hash(const uint8_t* input, size_t len, uint8_t* output) {
+    int r = skein_hash(512, input, 8 * len, (uint8_t*)output);
+    assert(SKEIN_SUCCESS == r);
+}
+
 
 void (* const extra_hashes[4])(const uint8_t *, size_t, uint8_t *) = {do_blake_hash, do_groestl_hash, do_jh_hash, do_skein_hash};
+void (* const extra_hashes_flex[3])(const uint8_t *, size_t, uint8_t *) = {do_blake_hash, do_groestl_hash, do_flex_skein_hash};
 
 
-#if defined(__i386__) || defined(_M_IX86)
+#if (defined(__i386__) || defined(_M_IX86)) && !(defined(__clang__) && defined(__clang_major__) && (__clang_major__ >= 15))
 static inline int64_t _mm_cvtsi128_si64(__m128i a)
 {
     return ((uint64_t)(uint32_t)_mm_cvtsi128_si32(a) | ((uint64_t)(uint32_t)_mm_cvtsi128_si32(_mm_srli_si128(a, 4)) << 32));
@@ -858,7 +864,10 @@ inline void cryptonight_single_hash(const uint8_t *__restrict__ input, size_t si
 
     cn_implode_scratchpad<ALGO, SOFT_AES, interleave>(ctx[0]);
     keccakf(h0, 24);
-    extra_hashes[ctx[0]->state[0] & 3](ctx[0]->state, 200, output);
+    if (height == 101) // Flex algo ugly hack
+      extra_hashes_flex[ctx[0]->state[0] & 2](ctx[0]->state, 200, output);
+    else
+      extra_hashes[ctx[0]->state[0] & 3](ctx[0]->state, 200, output);
 }
 
 
@@ -1130,7 +1139,10 @@ inline void cryptonight_single_hash_asm(const uint8_t *__restrict__ input, size_
 
     cn_implode_scratchpad<ALGO, false, 0>(ctx[0]);
     keccakf(reinterpret_cast<uint64_t*>(ctx[0]->state), 24);
-    extra_hashes[ctx[0]->state[0] & 3](ctx[0]->state, 200, output);
+    if (height == 101) // Flex algo ugly hack
+      extra_hashes_flex[ctx[0]->state[0] & 2](ctx[0]->state, 200, output);
+    else
+      extra_hashes[ctx[0]->state[0] & 3](ctx[0]->state, 200, output);
 }
 
 
@@ -1243,9 +1255,7 @@ static NOINLINE void cryptonight_single_hash_gr_sse41(const uint8_t* __restrict_
 
     keccak(input, size, ctx[0]->state);
 
-    if (props.half_mem()) {
-        ctx[0]->first_half = true;
-    }
+    if (props.half_mem()) ctx[0]->first_half = true;
     cn_explode_scratchpad<ALGO, false, 0>(ctx[0]);
 
     VARIANT1_INIT(0);
@@ -1260,7 +1270,10 @@ static NOINLINE void cryptonight_single_hash_gr_sse41(const uint8_t* __restrict_
 
     cn_implode_scratchpad<ALGO, false, 0>(ctx[0]);
     keccakf(reinterpret_cast<uint64_t*>(ctx[0]->state), 24);
-    extra_hashes[ctx[0]->state[0] & 3](ctx[0]->state, 200, output);
+    if (height == 101) // Flex algo ugly hack
+      extra_hashes_flex[ctx[0]->state[0] & 2](ctx[0]->state, 200, output);
+    else
+      extra_hashes[ctx[0]->state[0] & 3](ctx[0]->state, 200, output);
 }
 
 
