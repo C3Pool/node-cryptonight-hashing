@@ -69,11 +69,12 @@ const size_t max_mem_size = 20 * 1024 * 1024;
 xmrig::VirtualMemory mem(max_mem_size, true, false, 0, 4096);
 static struct cryptonight_ctx* ctx = nullptr;
 
-const int MAXRX = 3;
+const int MAXRX = 4;
 int rx2id(xmrig::Algorithm::Id algo) {
   switch (algo) {
       case xmrig::Algorithm::RX_0:     return 0;
       case xmrig::Algorithm::RX_ARQ:   return 1;
+      case xmrig::Algorithm::RX_XEQ:   return 2;
       //case xmrig::Algorithm::RX_WOW:   return 2;
       //case xmrig::Algorithm::RX_GRAFT: return 3;
       //case xmrig::Algorithm::RX_SFX:   return 4;
@@ -109,21 +110,21 @@ void init_rx(const uint8_t* seed_hash_data, xmrig::Algorithm::Id algo) {
         case xmrig::Algorithm::RX_0:
             randomx_apply_config(RandomX_MoneroConfig);
             break;
-        case xmrig::Algorithm::RX_WOW:
-            randomx_apply_config(RandomX_WowneroConfig);
-            break;
+        //case xmrig::Algorithm::RX_WOW:
+        //    randomx_apply_config(RandomX_WowneroConfig);
+        //    break;
         case xmrig::Algorithm::RX_ARQ:
             randomx_apply_config(RandomX_ArqmaConfig);
             break;
         case xmrig::Algorithm::RX_XEQ:
             randomx_apply_config(RandomX_EquilibriaConfig);
             break;
-        case xmrig::Algorithm::RX_GRAFT:
-            randomx_apply_config(RandomX_GraftConfig);
-            break;
-        case xmrig::Algorithm::RX_KEVA:
-            randomx_apply_config(RandomX_KevaConfig);
-            break;
+        //case xmrig::Algorithm::RX_GRAFT:
+        //    randomx_apply_config(RandomX_GraftConfig);
+        //    break;
+        //case xmrig::Algorithm::RX_KEVA:
+        //    randomx_apply_config(RandomX_KevaConfig);
+        //    break;
         case xmrig::Algorithm::RX_XLA:
             randomx_apply_config(RandomX_ScalaConfig);
             break;
@@ -200,10 +201,10 @@ NAN_METHOD(randomx) {
         //case 1:  xalgo = xmrig::Algorithm::RX_DEFYX; break;
         case 2:  xalgo = xmrig::Algorithm::RX_ARQ; break;
         case 3:  xalgo = xmrig::Algorithm::RX_XLA; break;
-        case 17: xalgo = xmrig::Algorithm::RX_WOW; break;
+        //case 17: xalgo = xmrig::Algorithm::RX_WOW; break;
         //case 18: xalgo = xmrig::Algorithm::RX_LOKI; break;
-        case 19: xalgo = xmrig::Algorithm::RX_KEVA; break;
-        case 20: xalgo = xmrig::Algorithm::RX_GRAFT; break;
+        //case 19: xalgo = xmrig::Algorithm::RX_KEVA; break;
+        //case 20: xalgo = xmrig::Algorithm::RX_GRAFT; break;
         case 22: xalgo = xmrig::Algorithm::RX_XEQ; break;
         default: xalgo = xmrig::Algorithm::RX_0;
     }
